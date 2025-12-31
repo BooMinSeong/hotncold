@@ -52,6 +52,8 @@ class Config:
     # Search Related Options
     n: int = 4
     temperature: float = 0.8
+    temperatures: list[float] | None = None
+    temperature_ratios: list[float] | None = None
     top_p: float = 1.0
     prm_batch_size: int = 4
     search_batch_size: int = 25
@@ -69,10 +71,34 @@ class Config:
     sort_completed: bool = False
 
     def __post_init__(self):
+        import math
+
+        # Temperature validation
+        if self.temperatures is not None:
+            if len(self.temperatures) == 0:
+                raise ValueError("temperatures list cannot be empty")
+
+            if self.temperature_ratios is not None:
+                if len(self.temperature_ratios) != len(self.temperatures):
+                    raise ValueError("temperature_ratios length must match temperatures length")
+                if not math.isclose(sum(self.temperature_ratios), 1.0, abs_tol=1e-6):
+                    raise ValueError("temperature_ratios must sum to 1.0")
+            else:
+                # Equal distribution - n must be divisible
+                if self.n % len(self.temperatures) != 0:
+                    raise ValueError(f"n ({self.n}) must be divisible by temperatures count")
+
         if self.approach == "dvts":
             if self.n % self.beam_width != 0:
                 raise ValueError("n should be a multiple of beam_width")
             self.n_beams = self.n // self.beam_width
+
+            # DVTS specific validation for temperatures
+            if self.temperatures is not None and self.temperature_ratios is None:
+                if self.n_beams % len(self.temperatures) != 0:
+                    raise ValueError(
+                        f"n_beams ({self.n_beams}) must be divisible by temperatures count for DVTS"
+                    )
 
         if self.approach == "beam_search":
             # TODO: implemented a batched version
@@ -89,10 +115,18 @@ class Config:
                 )
             revisions = get_dataset_revisions(self.hub_dataset_id)
 
+            # Temperature string helper
+            if self.temperatures is not None:
+                temp_str = f"temps_{'_'.join(str(t) for t in self.temperatures)}"
+                if self.temperature_ratios is not None:
+                    temp_str += f"__r_{'_'.join(str(r) for r in self.temperature_ratios)}"
+            else:
+                temp_str = f"T-{self.temperature}"
+
             if self.approach == "beam_search" or self.approach == "dvts":
-                self.revision = f"{self.dataset_name.replace('/', '_')}--T-{self.temperature}--top_p-{self.top_p}--n-{self.n}--m-{self.beam_width}--iters-{self.num_iterations}--look-{self.lookahead}--seed-{self.seed}--agg_strategy--{self.agg_strategy}"
+                self.revision = f"{self.dataset_name.replace('/', '_')}--{temp_str}--top_p-{self.top_p}--n-{self.n}--m-{self.beam_width}--iters-{self.num_iterations}--look-{self.lookahead}--seed-{self.seed}--agg_strategy--{self.agg_strategy}"
             elif self.approach == "best_of_n":
-                self.revision = f"{self.dataset_name.replace('/', '_')}--T-{self.temperature}--top_p-{self.top_p}--n-{self.n}--seed-{self.seed}--agg_strategy-{self.agg_strategy}"
+                self.revision = f"{self.dataset_name.replace('/', '_')}--{temp_str}--top_p-{self.top_p}--n-{self.n}--seed-{self.seed}--agg_strategy-{self.agg_strategy}"
             else:
                 raise ValueError(f"Unknown approach {self.approach}")
             if self.dataset_start is not None and self.dataset_end is not None:

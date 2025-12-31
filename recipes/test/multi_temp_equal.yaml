@@ -1,0 +1,19 @@
+approach: best_of_n
+model_path: "meta-llama/Llama-3.2-1B-Instruct"
+prm_path: "RLHFlow/Llama3.1-8B-PRM-Deepseek-Data"
+
+# Multi-temperature configuration (equal distribution)
+n: 6
+temperatures: [0.4, 0.8, 1.2]  # 2 samples each
+
+# Dataset configuration
+dataset_name: "HuggingFaceH4/MATH-500"
+dataset_split: "test"
+dataset_start: 0
+dataset_end: 5
+num_samples: 5
+
+# Other parameters
+seed: 0
+gpu_memory_utilization: 0.5
+search_batch_size: 5

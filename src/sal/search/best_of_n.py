@@ -22,6 +22,8 @@ from sal.utils.score import aggregate_scores
 
 
 def best_of_n(x, config: Config, llm: LLM, prm: PRM):
+    from sal.utils.temperature import get_temperature_assignment
+
     tokenizer = llm.get_tokenizer()
 
     convs = [
@@ -39,6 +41,9 @@ def best_of_n(x, config: Config, llm: LLM, prm: PRM):
         convs, tokenize=False, add_generation_prompt=True
     )
 
+    # Temperature assignment
+    temp_assignment = get_temperature_assignment(config)
+
     # Duplicate convs to generate config.n completions per prompt so we can do continous batching
     # This makes [p1, p2, p3, p4] become [p1, p1, p2, p2, p3, p3, p4, p4] for e.g. config.n=2
     templated_convs = [c for conv in templated_convs for c in [conv] * config.n]
@@ -47,16 +52,23 @@ def best_of_n(x, config: Config, llm: LLM, prm: PRM):
     completions = [[] for _ in range(len(x["problem"]))]
     completion_tokens = [[] for _ in range(len(x["problem"]))]
 
-    sampling_params = SamplingParams(
-        temperature=config.temperature,
-        max_tokens=config.max_tokens,
-        top_p=config.top_p,
-        n=1,  # Since we've already duplicated the prompt_token_ids, we only need to generate 1 completion per prompt
-    )
+    # Create SamplingParams list - one for each duplicated prompt
+    # temp_assignment is repeated for each problem in the batch
+    num_problems = len(x["problem"])
+    sampling_params_list = [
+        SamplingParams(
+            temperature=temp,
+            max_tokens=config.max_tokens,
+            top_p=config.top_p,
+            n=1,
+        )
+        for _ in range(num_problems)
+        for temp in temp_assignment
+    ]
 
     responses = llm.generate(
         templated_convs,
-        sampling_params=sampling_params,
+        sampling_params=sampling_params_list,
         use_tqdm=False,
     )
     if len(responses) != len(x["problem"]) * config.n:
