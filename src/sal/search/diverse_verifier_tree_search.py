@@ -69,12 +69,10 @@ def _dvts(batch_of_prompts: list[str], config: Config, llm: LLM, prm: PRM):
         if len(gen_beams) == 0:
             break
 
-        # Calculate number of continuations per diverse path
-        continuations_per_path = config.n // config.beam_width
-
-        # Get temperature assignment for continuations
+        # Get temperature assignment for diverse paths
+        # Each beam generates beam_width diverse paths
         temp_config = copy.copy(config)
-        temp_config.n = continuations_per_path
+        temp_config.n = config.beam_width
         temps = get_temperature_assignment(temp_config)
 
         # Prepare prompts and sampling params for each beam's diverse paths
@@ -102,8 +100,8 @@ def _dvts(batch_of_prompts: list[str], config: Config, llm: LLM, prm: PRM):
             # Generate beam_width diverse paths with different temperatures
             for path_idx in range(config.beam_width):
                 # Assign temperature based on path index
-                # path_idx % continuations_per_path cycles through temperatures
-                t = temps[path_idx % continuations_per_path]
+                # Each path gets a different temperature
+                t = temps[path_idx]
 
                 prompts.append(templated_conv)
                 sampling_params_list.append(
