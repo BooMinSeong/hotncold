@@ -14,6 +14,7 @@
 # limitations under the License.
 
 
+import copy
 import logging
 from collections import defaultdict
 
@@ -24,8 +25,9 @@ from vllm import LLM, SamplingParams
 from sal.config import Config
 from sal.models.reward_models import PRM
 from sal.utils.score import aggregate_scores
+from sal.utils.temperature import get_temperature_assignment
 
-from .utils import Beam, build_conv, generate_k_steps
+from .utils import Beam, build_conv
 
 logger = logging.getLogger()
 
@@ -67,66 +69,130 @@ def _dvts(batch_of_prompts: list[str], config: Config, llm: LLM, prm: PRM):
         if len(gen_beams) == 0:
             break
 
-        if i == config.num_iterations - 1:
-            # last iteration, generate to EOS
-            sampling_params = SamplingParams(
-                temperature=config.temperature,
-                max_tokens=2048,
-                top_p=config.top_p,
-                n=1,
-            )
+        # Calculate number of continuations per diverse path
+        continuations_per_path = config.n // config.beam_width
 
-        convs = [
-            build_conv(b.prompt, b.current_text, config.system_prompt)
-            for b in gen_beams
-        ]
-        continue_final_message = i > 0
-        add_generation_prompt = i == 0
+        # Get temperature assignment for continuations
+        temp_config = copy.copy(config)
+        temp_config.n = continuations_per_path
+        temps = get_temperature_assignment(temp_config)
+
+        # Prepare prompts and sampling params for each beam's diverse paths
+        prompts = []
+        sampling_params_list = []
+        is_last_iteration = i == config.num_iterations - 1
 
         tokenizer = llm.get_tokenizer()
-        # TODO: set the augmented template from a file
         if config.custom_chat_template is not None:
             tokenizer.chat_template = config.custom_chat_template
-        templated_convs = tokenizer.apply_chat_template(
-            convs,
-            add_generation_prompt=add_generation_prompt,
-            continue_final_message=continue_final_message,
-            tokenize=False,
-        )
-        lookahead = 0 if i == config.num_iterations - 1 else config.lookahead
-        gen_results = generate_k_steps(
-            templated_convs, lookahead, llm, sampling_params, config.beam_width
-        )
 
-        prompts, completions = [], []
-        for beam, gen_result in zip(gen_beams, gen_results, strict=True):
-            beam.next_texts = gen_result.next_texts
-            beam.stop_reasons = gen_result.stop_reasons
-            beam.lookahead_texts = gen_result.lookahead_texts
+        # For each beam, we'll generate beam_width diverse paths
+        # Each diverse path will have continuations_per_path temperature variants
+        # Total: len(gen_beams) * beam_width * continuations_per_path generations
+
+        # First, generate initial diverse paths (using original method with beam_width)
+        # We need to maintain diversity, so we'll use n=beam_width for the first step
+        for beam in gen_beams:
+            conv = build_conv(beam.prompt, beam.current_text, config.system_prompt)
+            templated_conv = tokenizer.apply_chat_template(
+                conv,
+                add_generation_prompt=(i == 0),
+                continue_final_message=(i > 0),
+                tokenize=False,
+            )
+
+            # For each diverse path slot, generate continuations_per_path variants with different temps
+            for _ in range(config.beam_width):
+                for t in temps:
+                    prompts.append(templated_conv)
+                    sampling_params_list.append(
+                        SamplingParams(
+                            temperature=t,
+                            max_tokens=2048,
+                            top_p=config.top_p,
+                            stop=["\n\n"] if not is_last_iteration else None,
+                            include_stop_str_in_output=True,
+                            n=1,
+                        )
+                    )
+
+        # Generate all continuations
+        outputs = llm.generate(prompts, sampling_params_list, use_tqdm=False)
+
+        # Process outputs for each beam
+        output_idx = 0
+        for beam in gen_beams:
+            # For this beam, we have beam_width diverse paths
+            # Each path has continuations_per_path temperature variants
+            diverse_paths_texts = []
+            diverse_paths_stops = []
+
+            for path_idx in range(config.beam_width):
+                path_outputs = outputs[output_idx : output_idx + continuations_per_path]
+                path_texts = [out.outputs[0].text for out in path_outputs]
+                path_stops = [out.outputs[0].finish_reason for out in path_outputs]
+
+                diverse_paths_texts.append(path_texts)
+                diverse_paths_stops.append(path_stops)
+                output_idx += continuations_per_path
+
+            # Score all variants of all diverse paths
+            prm_prompts = []
+            prm_completions = []
+            for path_texts in diverse_paths_texts:
+                for text in path_texts:
+                    prm_prompts.append(beam.prompt)
+                    prm_completions.append([beam.current_text + text])
+
+            path_scores = prm.score(prm_prompts, prm_completions)
+
+            # Select best variant for each diverse path
+            best_texts = []
+            best_stops = []
+            all_path_scores = []
+
+            score_idx = 0
+            for path_idx in range(config.beam_width):
+                path_variant_scores = []
+                for _ in range(continuations_per_path):
+                    agg_score = aggregate_scores(
+                        path_scores[score_idx][0], config.agg_strategy
+                    )
+                    path_variant_scores.append(agg_score)
+                    score_idx += 1
+
+                best_variant_idx = np.argmax(path_variant_scores)
+                best_texts.append(diverse_paths_texts[path_idx][best_variant_idx])
+                best_stops.append(diverse_paths_stops[path_idx][best_variant_idx])
+                all_path_scores.append(
+                    path_scores[path_idx * continuations_per_path + best_variant_idx][0]
+                )
+
+            # Store the best variants for each diverse path
+            beam.next_texts = best_texts
+            beam.stop_reasons = best_stops
+
             if len(beam.next_texts) != config.beam_width:
                 beam.pruned = True
-                # rarely ~1/1000 the model will generate few beams than expected. #TODO: investigate why
                 logger.warning(
                     f"beam {beam.index} has {len(beam.next_texts)} completions"
                 )
-            prompts.append(beam.prompt)
-            completions.append([beam.current_text + t for t in beam.lookahead_texts])
 
-        # scoring and chose best generation per beam TODO: add option for selection across beams within the same prompt
-
-        all_scores = prm.score(prompts, completions)
-
-        for beam, scores in zip(gen_beams, all_scores, strict=True):
-            agg_scores = [aggregate_scores(s, config.agg_strategy) for s in scores]
+            # Select the overall best path among the diverse paths
+            agg_scores = [
+                aggregate_scores(s, config.agg_strategy) for s in all_path_scores
+            ]
             best_score_ind = np.argmax(agg_scores)
-            beam.all_scores = scores
+
+            beam.all_scores = all_path_scores
             beam.previous_text = beam.current_text
             beam.current_text = beam.current_text + beam.next_texts[best_score_ind]
             beam.history.append(beam.next_texts[best_score_ind])
-            beam.best_scores = scores[best_score_ind]
+            beam.best_scores = all_path_scores[best_score_ind]
+
             if (
                 beam.next_texts[best_score_ind] == ""
-                or beam.stop_reasons[best_score_ind] == "EOS"
+                or beam.stop_reasons[best_score_ind] == "stop"
             ):
                 # stopped on EOS, prune
                 beam.pruned = True
