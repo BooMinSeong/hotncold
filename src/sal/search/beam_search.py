@@ -101,7 +101,7 @@ def _beam_search(batch_of_prompts, config: Config, llm: LLM, prm: PRM) -> list[B
         if config.custom_chat_template is not None:
             tokenizer.chat_template = config.custom_chat_template
 
-        for beam in active_beams:
+        for beam_idx, beam in enumerate(active_beams):
             conv = build_conv(beam.prompt, beam.current_text, config.system_prompt)
             templated_conv = tokenizer.apply_chat_template(
                 conv,
@@ -110,70 +110,45 @@ def _beam_search(batch_of_prompts, config: Config, llm: LLM, prm: PRM) -> list[B
                 tokenize=False,
             )
 
-            for t in temps:
-                prompts.append(templated_conv)
-                sampling_params_list.append(
-                    SamplingParams(
-                        temperature=t,
-                        max_tokens=config.max_tokens,
-                        top_p=config.top_p,
-                        stop=["\n\n"] if not is_last_iteration else None,
-                        include_stop_str_in_output=True,
-                        n=1,
-                    )
+            # Assign temperature based on position within group
+            # beam_idx % continuations_per_beam cycles through temperatures
+            t = temps[beam_idx % continuations_per_beam]
+
+            prompts.append(templated_conv)
+            sampling_params_list.append(
+                SamplingParams(
+                    temperature=t,
+                    max_tokens=config.max_tokens,
+                    top_p=config.top_p,
+                    stop=["\n\n"] if not is_last_iteration else None,
+                    include_stop_str_in_output=True,
+                    n=1,
                 )
-
-        # Generate all continuations
-        outputs = llm.generate(prompts, sampling_params_list, use_tqdm=False)
-
-        # Group outputs by beam and assign to next_texts
-        for beam_idx, beam in enumerate(active_beams):
-            start_idx = beam_idx * continuations_per_beam
-            end_idx = start_idx + continuations_per_beam
-            beam_outputs = outputs[start_idx:end_idx]
-
-            # Store all continuations for this beam
-            beam.next_texts = [out.outputs[0].text for out in beam_outputs]
-            beam.stop_reasons = [out.outputs[0].finish_reason for out in beam_outputs]
-            beam.completion_tokens += sum(
-                len(out.outputs[0].token_ids) for out in beam_outputs
             )
 
-        # Score all continuations with PRM
-        prm_prompts, prm_completions = [], []
-        for beam in active_beams:
-            for next_text in beam.next_texts:
-                prm_prompts.append(beam.prompt)
-                prm_completions.append([beam.current_text + next_text])
+        # Generate one continuation per beam (total = config.n)
+        outputs = llm.generate(prompts, sampling_params_list, use_tqdm=False)
 
-        scores = prm.score(prm_prompts, prm_completions)
+        # Assign outputs to beams and score with PRM
+        prompts, completions = [], []
+        for beam, output in zip(active_beams, outputs, strict=True):
+            beam.next_texts = [output.outputs[0].text]
+            beam.stop_reasons = [output.outputs[0].finish_reason]
+            beam.completion_tokens += len(output.outputs[0].token_ids)
+            beam.current_text += beam.next_texts[0]
+            beam.history.append(beam.next_texts[0])
 
-        # Select best continuation for each beam
-        score_idx = 0
-        for beam in active_beams:
-            beam_scores = []
-            for _ in beam.next_texts:
-                agg_score = aggregate_scores(scores[score_idx][0], config.agg_strategy)
-                beam_scores.append(agg_score)
-                score_idx += 1
-
-            # Select best continuation
-            best_idx = np.argmax(beam_scores)
-
-            # Apply best continuation to beam
-            beam.current_text += beam.next_texts[best_idx]
-            beam.history.append(beam.next_texts[best_idx])
-            beam.all_scores = scores[
-                (active_beams.index(beam) * continuations_per_beam) + best_idx
-            ][0]
-
-            # Check if completed
-            if (
-                beam.stop_reasons[best_idx] in ["stop", "length"]
-                or beam.next_texts[best_idx] == ""
-            ):
+            if beam.stop_reasons[0] in ["stop", "length"] or beam.next_texts[0] == "":
                 beam.completed = True
                 completed_beams.append(beam)
+            prompts.append(beam.prompt)
+            completions.append([beam.current_text])
+
+        # PRM scoring
+        scores = prm.score(prompts, completions)
+
+        for beam, score in zip(active_beams, scores, strict=True):
+            beam.all_scores = score[0]
 
         # Filter out completed beams
         active_beams = [b for b in active_beams if not b.completed]

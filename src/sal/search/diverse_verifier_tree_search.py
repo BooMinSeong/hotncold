@@ -86,12 +86,10 @@ def _dvts(batch_of_prompts: list[str], config: Config, llm: LLM, prm: PRM):
         if config.custom_chat_template is not None:
             tokenizer.chat_template = config.custom_chat_template
 
-        # For each beam, we'll generate beam_width diverse paths
-        # Each diverse path will have continuations_per_path temperature variants
-        # Total: len(gen_beams) * beam_width * continuations_per_path generations
+        # For each beam, generate beam_width diverse paths
+        # Each diverse path gets ONE temperature based on its path index
+        # Total: len(gen_beams) * beam_width = config.n generations
 
-        # First, generate initial diverse paths (using original method with beam_width)
-        # We need to maintain diversity, so we'll use n=beam_width for the first step
         for beam in gen_beams:
             conv = build_conv(beam.prompt, beam.current_text, config.system_prompt)
             templated_conv = tokenizer.apply_chat_template(
@@ -101,76 +99,46 @@ def _dvts(batch_of_prompts: list[str], config: Config, llm: LLM, prm: PRM):
                 tokenize=False,
             )
 
-            # For each diverse path slot, generate continuations_per_path variants with different temps
-            for _ in range(config.beam_width):
-                for t in temps:
-                    prompts.append(templated_conv)
-                    sampling_params_list.append(
-                        SamplingParams(
-                            temperature=t,
-                            max_tokens=2048,
-                            top_p=config.top_p,
-                            stop=["\n\n"] if not is_last_iteration else None,
-                            include_stop_str_in_output=True,
-                            n=1,
-                        )
-                    )
+            # Generate beam_width diverse paths with different temperatures
+            for path_idx in range(config.beam_width):
+                # Assign temperature based on path index
+                # path_idx % continuations_per_path cycles through temperatures
+                t = temps[path_idx % continuations_per_path]
 
-        # Generate all continuations
+                prompts.append(templated_conv)
+                sampling_params_list.append(
+                    SamplingParams(
+                        temperature=t,
+                        max_tokens=2048,
+                        top_p=config.top_p,
+                        stop=["\n\n"] if not is_last_iteration else None,
+                        include_stop_str_in_output=True,
+                        n=1,
+                    )
+                )
+
+        # Generate all diverse paths (total = config.n)
         outputs = llm.generate(prompts, sampling_params_list, use_tqdm=False)
 
         # Process outputs for each beam
+        prompts_prm = []
+        completions_prm = []
         output_idx = 0
+
         for beam in gen_beams:
-            # For this beam, we have beam_width diverse paths
-            # Each path has continuations_per_path temperature variants
-            diverse_paths_texts = []
-            diverse_paths_stops = []
+            # Extract beam_width diverse paths for this beam
+            beam.next_texts = []
+            beam.stop_reasons = []
 
             for path_idx in range(config.beam_width):
-                path_outputs = outputs[output_idx : output_idx + continuations_per_path]
-                path_texts = [out.outputs[0].text for out in path_outputs]
-                path_stops = [out.outputs[0].finish_reason for out in path_outputs]
+                output = outputs[output_idx]
+                beam.next_texts.append(output.outputs[0].text)
+                beam.stop_reasons.append(output.outputs[0].finish_reason)
+                output_idx += 1
 
-                diverse_paths_texts.append(path_texts)
-                diverse_paths_stops.append(path_stops)
-                output_idx += continuations_per_path
-
-            # Score all variants of all diverse paths
-            prm_prompts = []
-            prm_completions = []
-            for path_texts in diverse_paths_texts:
-                for text in path_texts:
-                    prm_prompts.append(beam.prompt)
-                    prm_completions.append([beam.current_text + text])
-
-            path_scores = prm.score(prm_prompts, prm_completions)
-
-            # Select best variant for each diverse path
-            best_texts = []
-            best_stops = []
-            all_path_scores = []
-
-            score_idx = 0
-            for path_idx in range(config.beam_width):
-                path_variant_scores = []
-                for _ in range(continuations_per_path):
-                    agg_score = aggregate_scores(
-                        path_scores[score_idx][0], config.agg_strategy
-                    )
-                    path_variant_scores.append(agg_score)
-                    score_idx += 1
-
-                best_variant_idx = np.argmax(path_variant_scores)
-                best_texts.append(diverse_paths_texts[path_idx][best_variant_idx])
-                best_stops.append(diverse_paths_stops[path_idx][best_variant_idx])
-                all_path_scores.append(
-                    path_scores[path_idx * continuations_per_path + best_variant_idx][0]
-                )
-
-            # Store the best variants for each diverse path
-            beam.next_texts = best_texts
-            beam.stop_reasons = best_stops
+                # Prepare for PRM scoring
+                prompts_prm.append(beam.prompt)
+                completions_prm.append([beam.current_text + beam.next_texts[path_idx]])
 
             if len(beam.next_texts) != config.beam_width:
                 beam.pruned = True
@@ -178,17 +146,26 @@ def _dvts(batch_of_prompts: list[str], config: Config, llm: LLM, prm: PRM):
                     f"beam {beam.index} has {len(beam.next_texts)} completions"
                 )
 
-            # Select the overall best path among the diverse paths
-            agg_scores = [
-                aggregate_scores(s, config.agg_strategy) for s in all_path_scores
-            ]
+        # Score all diverse paths with PRM
+        all_scores = prm.score(prompts_prm, completions_prm)
+
+        # Assign scores and select best path for each beam
+        score_idx = 0
+        for beam in gen_beams:
+            beam_scores = []
+            for path_idx in range(config.beam_width):
+                beam_scores.append(all_scores[score_idx][0])
+                score_idx += 1
+
+            # Select best path based on aggregate score
+            agg_scores = [aggregate_scores(s, config.agg_strategy) for s in beam_scores]
             best_score_ind = np.argmax(agg_scores)
 
-            beam.all_scores = all_path_scores
+            beam.all_scores = beam_scores
             beam.previous_text = beam.current_text
             beam.current_text = beam.current_text + beam.next_texts[best_score_ind]
             beam.history.append(beam.next_texts[best_score_ind])
-            beam.best_scores = all_path_scores[best_score_ind]
+            beam.best_scores = beam_scores[best_score_ind]
 
             if (
                 beam.next_texts[best_score_ind] == ""
