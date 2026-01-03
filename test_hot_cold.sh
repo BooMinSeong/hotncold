@@ -12,14 +12,14 @@ echo ""
 
 # Configuration
 GPU_ID=${GPU_ID:-1}
-MODEL_PATH=${MODEL_PATH:-"meta-llama/Llama-3.2-1B-Instruct"}
+MODEL_PATH=${MODEL_PATH:-"Qwen/Qwen2.5-1.5B-Instruct"}
 DATASET_NAME=${DATASET_NAME:-"HuggingFaceH4/MATH-500"}
 NUM_SAMPLES=${NUM_SAMPLES:-2}
 OUTPUT_BASE="./test_outputs_hot_cold"
 
-# Temperature settings
-TEMPS="0.6,0.8,1.0"
-TEMP_RATIOS="0.33,0.34,0.33"
+# Temperature settings (space-separated for argparse)
+TEMPS="0.6 0.8 1.0"
+TEMP_RATIOS="0.33 0.34 0.33"
 
 echo "Configuration:"
 echo "  GPU: $GPU_ID"
@@ -46,8 +46,8 @@ CUDA_VISIBLE_DEVICES=$GPU_ID uv run python scripts/test_time_compute.py \
     --dataset_name "$DATASET_NAME" \
     --num_samples $NUM_SAMPLES \
     --n 12 \
-    --temperatures "$TEMPS" \
-    --temperature_ratios "$TEMP_RATIOS" \
+    --temperatures $TEMPS \
+    --temperature_ratios $TEMP_RATIOS \
     --output_dir "$OUTPUT_DIR" \
     --custom_chat_template none
 
@@ -67,7 +67,7 @@ CUDA_VISIBLE_DEVICES=$GPU_ID uv run python scripts/test_time_compute.py \
     --dataset_name "$DATASET_NAME" \
     --num_samples $NUM_SAMPLES \
     --n 12 \
-    --temperatures "$TEMPS" \
+    --temperatures $TEMPS \
     --output_dir "$OUTPUT_DIR" \
     --custom_chat_template none
 
@@ -89,8 +89,8 @@ CUDA_VISIBLE_DEVICES=$GPU_ID uv run python scripts/test_time_compute.py \
     --n 12 \
     --beam_width 3 \
     --num_iterations 3 \
-    --temperatures "$TEMPS" \
-    --temperature_ratios "$TEMP_RATIOS" \
+    --temperatures $TEMPS \
+    --temperature_ratios $TEMP_RATIOS \
     --output_dir "$OUTPUT_DIR" \
     --custom_chat_template none
 
@@ -134,8 +134,8 @@ CUDA_VISIBLE_DEVICES=$GPU_ID uv run python scripts/test_time_compute.py \
     --n 12 \
     --beam_width 4 \
     --num_iterations 3 \
-    --temperatures "$TEMPS" \
-    --temperature_ratios "$TEMP_RATIOS" \
+    --temperatures $TEMPS \
+    --temperature_ratios $TEMP_RATIOS \
     --output_dir "$OUTPUT_DIR" \
     --custom_chat_template none
 
