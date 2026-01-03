@@ -80,13 +80,17 @@ class Config:
 
             if self.temperature_ratios is not None:
                 if len(self.temperature_ratios) != len(self.temperatures):
-                    raise ValueError("temperature_ratios length must match temperatures length")
+                    raise ValueError(
+                        "temperature_ratios length must match temperatures length"
+                    )
                 if not math.isclose(sum(self.temperature_ratios), 1.0, abs_tol=1e-6):
                     raise ValueError("temperature_ratios must sum to 1.0")
             else:
                 # Equal distribution - n must be divisible
                 if self.n % len(self.temperatures) != 0:
-                    raise ValueError(f"n ({self.n}) must be divisible by temperatures count")
+                    raise ValueError(
+                        f"n ({self.n}) must be divisible by temperatures count"
+                    )
 
         if self.approach == "dvts":
             if self.n % self.beam_width != 0:
@@ -119,7 +123,9 @@ class Config:
             if self.temperatures is not None:
                 temp_str = f"temps_{'_'.join(str(t) for t in self.temperatures)}"
                 if self.temperature_ratios is not None:
-                    temp_str += f"__r_{'_'.join(str(r) for r in self.temperature_ratios)}"
+                    temp_str += (
+                        f"__r_{'_'.join(str(r) for r in self.temperature_ratios)}"
+                    )
             else:
                 temp_str = f"T-{self.temperature}"
 

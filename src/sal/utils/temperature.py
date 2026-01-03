@@ -55,7 +55,10 @@ def get_temperature_assignment(config: Config) -> list[float]:
     while len(assignment) < config.n:
         max_ratio_idx = config.temperature_ratios.index(max(config.temperature_ratios))
         assignment.insert(
-            sum(int(config.n * r) for r in config.temperature_ratios[: max_ratio_idx + 1]),
+            sum(
+                int(config.n * r)
+                for r in config.temperature_ratios[: max_ratio_idx + 1]
+            ),
             config.temperatures[max_ratio_idx],
         )
 

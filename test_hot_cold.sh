@@ -49,7 +49,6 @@ CUDA_VISIBLE_DEVICES=$GPU_ID uv run python scripts/test_time_compute.py \
     --temperatures $TEMPS \
     --temperature_ratios $TEMP_RATIOS \
     --output_dir "$OUTPUT_DIR" \
-    --custom_chat_template none
 
 echo "✓ best_of_n completed"
 echo ""
@@ -69,7 +68,6 @@ CUDA_VISIBLE_DEVICES=$GPU_ID uv run python scripts/test_time_compute.py \
     --n 12 \
     --temperatures $TEMPS \
     --output_dir "$OUTPUT_DIR" \
-    --custom_chat_template none
 
 echo "✓ best_of_n (equal) completed"
 echo ""
@@ -88,11 +86,9 @@ CUDA_VISIBLE_DEVICES=$GPU_ID uv run python scripts/test_time_compute.py \
     --num_samples $NUM_SAMPLES \
     --n 12 \
     --beam_width 3 \
-    --num_iterations 3 \
     --temperatures $TEMPS \
     --temperature_ratios $TEMP_RATIOS \
     --output_dir "$OUTPUT_DIR" \
-    --custom_chat_template none
 
 echo "✓ beam_search completed"
 echo ""
@@ -111,10 +107,8 @@ CUDA_VISIBLE_DEVICES=$GPU_ID uv run python scripts/test_time_compute.py \
     --num_samples $NUM_SAMPLES \
     --n 12 \
     --beam_width 3 \
-    --num_iterations 3 \
     --temperature 0.8 \
     --output_dir "$OUTPUT_DIR" \
-    --custom_chat_template none
 
 echo "✓ beam_search (baseline) completed"
 echo ""
@@ -133,11 +127,9 @@ CUDA_VISIBLE_DEVICES=$GPU_ID uv run python scripts/test_time_compute.py \
     --num_samples $NUM_SAMPLES \
     --n 12 \
     --beam_width 4 \
-    --num_iterations 3 \
     --temperatures $TEMPS \
     --temperature_ratios $TEMP_RATIOS \
     --output_dir "$OUTPUT_DIR" \
-    --custom_chat_template none
 
 echo "✓ DVTS completed"
 echo ""
@@ -156,10 +148,8 @@ CUDA_VISIBLE_DEVICES=$GPU_ID uv run python scripts/test_time_compute.py \
     --num_samples $NUM_SAMPLES \
     --n 12 \
     --beam_width 4 \
-    --num_iterations 3 \
     --temperature 0.8 \
     --output_dir "$OUTPUT_DIR" \
-    --custom_chat_template none
 
 echo "✓ DVTS (baseline) completed"
 echo ""

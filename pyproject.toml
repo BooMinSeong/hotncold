@@ -1,0 +1,46 @@
+[project]
+name = "search-and-learn"
+version = "0.1.0"
+description = "A tool for search-based methods on llms"
+readme = "README.md"
+requires-python = ">=3.10.9"
+license = {text = "Apache"}
+authors = [
+    {name = "The Hugging Face team (past and future)", email = "lewis@huggingface.co"}
+]
+keywords = ["nlp", "deep learning", "mcts"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Education",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    "accelerate",
+    "pebble",
+    "latex2sympy2==1.9.1",
+    "word2number",
+    "transformers>=4.47.0",
+    "fastapi",
+    "hf_transfer",
+]
+
+[project.optional-dependencies]
+quality = ["ruff", "isort"]
+tests = ["pytest"]
+dev = [
+    "vllm",
+    "ruff",
+    "isort",
+    "pytest",
+]
+trl = ["trl @ git+https://github.com/huggingface/trl.git"]
+
+[project.urls]
+Homepage = "https://github.com/huggingface/search-and-learn"
