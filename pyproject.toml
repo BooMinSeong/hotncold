@@ -29,6 +29,8 @@ dependencies = [
     "transformers>=4.47.0",
     "fastapi",
     "hf_transfer",
+    "vllm>=0.13.0",
+    "datasets>=4.4.2",
 ]
 
 [project.optional-dependencies]
