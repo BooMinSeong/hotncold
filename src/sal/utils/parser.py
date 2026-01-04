@@ -17,7 +17,7 @@ import dataclasses
 import os
 import sys
 from dataclasses import dataclass
-from typing import Any, List, NewType, Optional, Tuple, Union
+from typing import Any, List, NewType, Optional, Tuple, Union, get_origin, get_args
 
 from transformers import HfArgumentParser
 
@@ -65,6 +65,13 @@ class H4ArgumentParser(HfArgumentParser):
 
                     if base_type is List[str]:
                         inputs[arg] = [str(v) for v in val.split(",")]
+
+                    # Handle list[float] and List[float] (comma-separated)
+                    origin = get_origin(base_type)
+                    if origin in (list, List):
+                        args = get_args(base_type)
+                        if args and args[0] == float:
+                            inputs[arg] = [float(v) for v in val.split(",")]
 
                     # bool of a non-empty string is True, so we manually check for bools
                     if base_type is bool or base_type is Optional[bool]:
