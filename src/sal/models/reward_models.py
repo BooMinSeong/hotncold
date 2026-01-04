@@ -64,10 +64,6 @@ def batched_math_shepherd_inference(
         # Store the step scores for this batch
         output_scores.extend(step_scores)
 
-        # Clear GPU memory
-        del inputs_batch, logits, scores
-        torch.cuda.empty_cache()
-
     return output_scores
 
 
@@ -166,10 +162,11 @@ class RLHFFlow(PRM):
         questions: list[str],
         outputs: list[list[str]],
         batched: bool = True,
-        batch_size=8,
     ) -> list[list[float]]:
         if batched is True:
-            return self._score_batched(questions, outputs, batch_size=batch_size)
+            return self._score_batched(
+                questions, outputs, batch_size=self.search_config.prm_batch_size
+            )
         else:
             return self._score_single(questions, outputs)
 
@@ -213,7 +210,7 @@ class RLHFFlow(PRM):
         return all_scores
 
     def _score_batched(
-        self, questions: list[str], outputs: list[list[str]], batch_size: int = 2
+        self, questions: list[str], outputs: list[list[str]], batch_size: int
     ):
         # The RLHFlow models are trained to predict the "+" or "-" tokens in a dialogue, but since these are not unique
         # we need to introduce a dummy special token here for masking.
@@ -300,29 +297,44 @@ class SkyworkO1(PRM):
         self, questions: list[str], outputs: list[list[str]]
     ) -> list[list[float]]:
         # reference code: https://huggingface.co/Skywork/Skywork-o1-Open-PRM-Qwen-2.5-7B#huggingface-inference
-        all_scores = []
+        # Prepare all inputs
+        all_processed_data = []
+        lengths = []
         for question, answers in zip(questions, outputs):
-            processed_data = [
-                prepare_input(
+            for answer in answers:
+                processed = prepare_input(
                     question, answer, tokenizer=self.tokenizer, step_token="\n"
                 )
-                for answer in answers
-            ]
-            input_ids, steps, reward_flags = zip(*processed_data)
+                all_processed_data.append(processed)
+            lengths.append(len(answers))
+
+        # Mini-batch processing
+        all_step_scores = []
+        batch_size = self.search_config.prm_batch_size
+        device = self.model.pretrained_model.device
+        for i in range(0, len(all_processed_data), batch_size):
+            batch_data = all_processed_data[i : i + batch_size]
+            input_ids, steps, reward_flags = zip(*batch_data)
             input_ids, attention_mask, reward_flags = prepare_batch_input_for_model(
                 input_ids, reward_flags, self.tokenizer.pad_token_id
             )
-            device = self.model.pretrained_model.device
             with torch.no_grad():
                 _, _, rewards = self.model(
                     input_ids=input_ids.to(device),
                     attention_mask=attention_mask.to(device),
                     return_probs=True,
                 )
-                all_step_scores = derive_step_rewards(
+                batch_scores = derive_step_rewards(
                     rewards.detach().to("cpu", dtype=torch.float32), reward_flags
                 )
-            all_scores.append(all_step_scores)
+                all_step_scores.extend(batch_scores)
+
+        # Reshape to match input structure
+        all_scores = []
+        cumulative_lengths = list(accumulate(lengths))
+        for i, j in zip([0] + cumulative_lengths[:-1], cumulative_lengths):
+            all_scores.append(all_step_scores[i:j])
+
         return all_scores
 
 
@@ -347,10 +359,10 @@ class Qwen_2_5_Math(PRM):
     def score(
         self, questions: list[str], outputs: list[list[str]]
     ) -> list[list[float]]:
-        all_scores = []
-
+        # Prepare all inputs
+        all_processed_responses = []
+        lengths = []
         for question, answers in zip(questions, outputs):
-            processed_responses = []
             for answer in answers:
                 messages = [
                     {
@@ -366,19 +378,32 @@ class Qwen_2_5_Math(PRM):
                 conversation_str = self.tokenizer.apply_chat_template(
                     messages, tokenize=False, add_generation_prompt=False
                 )
-                processed_responses.append(conversation_str)
+                all_processed_responses.append(conversation_str)
+            lengths.append(len(answers))
 
+        # Mini-batch processing
+        all_step_rewards = []
+        batch_size = self.search_config.prm_batch_size
+        step_sep_id = self.tokenizer.encode("<extra_0>")[0]
+
+        for i in range(0, len(all_processed_responses), batch_size):
+            batch_responses = all_processed_responses[i : i + batch_size]
             input_ids = self.tokenizer(
-                processed_responses, return_tensors="pt", padding=True, truncation=True
+                batch_responses, return_tensors="pt", padding=True, truncation=True
             )["input_ids"].to(self.model.device)
 
             with torch.no_grad():
                 outputs = self.model(input_ids=input_ids)
 
-            step_sep_id = self.tokenizer.encode("<extra_0>")[0]
             token_masks = input_ids == step_sep_id
-            step_rewards = self.make_step_rewards(outputs[0], token_masks)
-            all_scores.append(step_rewards)
+            batch_rewards = self.make_step_rewards(outputs[0], token_masks)
+            all_step_rewards.extend(batch_rewards)
+
+        # Reshape to match input structure
+        all_scores = []
+        cumulative_lengths = list(accumulate(lengths))
+        for i, j in zip([0] + cumulative_lengths[:-1], cumulative_lengths):
+            all_scores.append(all_step_rewards[i:j])
 
         return all_scores
 

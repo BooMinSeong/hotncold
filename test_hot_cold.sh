@@ -86,6 +86,7 @@ CUDA_VISIBLE_DEVICES=$GPU_ID uv run python scripts/test_time_compute.py \
     --num_samples $NUM_SAMPLES \
     --n 12 \
     --beam_width 3 \
+    --search_batch_size 1 \
     --temperatures $TEMPS \
     --temperature_ratios $TEMP_RATIOS \
     --output_dir "$OUTPUT_DIR" \
@@ -107,6 +108,7 @@ CUDA_VISIBLE_DEVICES=$GPU_ID uv run python scripts/test_time_compute.py \
     --num_samples $NUM_SAMPLES \
     --n 12 \
     --beam_width 3 \
+    --search_batch_size 1 \
     --temperature 0.8 \
     --output_dir "$OUTPUT_DIR" \
 

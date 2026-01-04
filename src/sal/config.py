@@ -24,11 +24,11 @@ from sal.utils.hub import get_dataset_revisions
 @dataclass
 class Config:
     approach: Literal["best_of_n", "beam_search", "dvts"] = "best_of_n"
-    model_path: str = "meta-llama/Llama-3.2-1B-Instruct"
+    model_path: str = "Qwen/Qwen2.5-1.5B-Instruct"
     gpu_memory_utilization: float = (
         0.5  # vllm is allocated 0.5 of GPU memory, the PRM uses the rest
     )
-    prm_path: str = "RLHFlow/Llama3.1-8B-PRM-Deepseek-Data"
+    prm_path: str = "Skywork/Skywork-o1-Open-PRM-Qwen-2.5-1.5B"
     # Output Related Options
     output_dir: str = None
     num_proc: int = None
@@ -55,8 +55,8 @@ class Config:
     temperatures: list[float] | None = None
     temperature_ratios: list[float] | None = None
     top_p: float = 1.0
-    prm_batch_size: int = 4
-    search_batch_size: int = 25
+    prm_batch_size: int = 2
+    search_batch_size: int = 4
     seed: int = 42
     max_tokens: int = 2048
     agg_strategy: str = "last"  # Options: "last", "min", "prod"
