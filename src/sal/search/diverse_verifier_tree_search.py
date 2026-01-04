@@ -165,10 +165,7 @@ def _dvts(batch_of_prompts: list[str], config: Config, llm: LLM, prm: PRM):
             beam.history.append(beam.next_texts[best_score_ind])
             beam.best_scores = beam_scores[best_score_ind]
 
-            if (
-                beam.next_texts[best_score_ind] == ""
-                or beam.stop_reasons[best_score_ind] == "stop"
-            ):
+            if beam.next_texts[best_score_ind] == "":
                 # stopped on EOS, prune
                 beam.pruned = True
 
