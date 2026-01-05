@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=beam_search0_default # Job name
+#SBATCH --job-name=default_seed42 # Job name
 # cpu, gpu Setting
 # SBATCH --qos=hpgpu
 #SBATCH --partition=L40S
@@ -7,7 +7,7 @@
 #SBATCH --gres=gpu:1                   # Number of GPUs (per node)
 #SBATCH --cpus-per-task=8              # CPU cores/threads
 
-#SBATCH --array=8-9%10 # Array range (this creates 20 tasks with IDs from 1 to 20, with max 8 tasks concurrently)
+#SBATCH --array=1-10%10 # Array range (this creates 10 tasks with IDs from 1 to 10, with max 10 tasks concurrently)
 #SBATCH --output=logs/%x-%j_%A_%a.out   # Standard output (%A is replaced by job ID, %a by task ID)
 #SBATCH --error=logs/%x-%j_%A_%a.err    # Standard error
 #SBATCH --time=12:00:00                  # Time limit hrs:min:sec
@@ -32,16 +32,6 @@ source .venv/bin/activate
 export CC=$(which gcc)
 export CXX=$(which g++)
 
-
-# # Define the array of input files (assuming 10 input files)
-# STEP=50
-# ENDPOINT=$((SLURM_ARRAY_TASK_COUNT * STEP - STEP))
-# STARTS=($(seq 0 $STEP $ENDPOINT))  # Generate sequence from 0 to ENDPOINT with a step size of 100
-# # Use the SLURM_ARRAY_TASK_ID to pick the correct input file
-# INPUT_FILE=${INPUT_FILES[$SLURM_ARRAY_TASK_ID-1]}
-# 
-# DATASET_START=${STARTS[$SLURM_ARRAY_TASK_ID-1]}
-# DATASET_END=$((${STARTS[$SLURM_ARRAY_TASK_ID-1]}+$STEP))
 
 STEP=50
 TASK_INDEX=$((SLURM_ARRAY_TASK_ID - 1))
