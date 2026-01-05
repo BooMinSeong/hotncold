@@ -4,6 +4,6 @@ model_path: Qwen/Qwen2.5-1.5B-Instruct
 custom_chat_template: null
 approach: dvts
 n: 64
-search_batch_size: 8
-prm_batch_size: 2
+search_batch_size: 4
+prm_batch_size: 1
 seed: 0
