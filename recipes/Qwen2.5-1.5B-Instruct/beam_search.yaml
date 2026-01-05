@@ -7,4 +7,4 @@ approach: beam_search
 n: 64
 search_batch_size: 1  # DO NOT CHANGE!
 prm_batch_size: 1
-seed: 0
+seed: 42

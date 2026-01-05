@@ -1,13 +1,13 @@
 #!/bin/bash
-#SBATCH --job-name=bon42 # Job name
+#SBATCH --job-name=beam_search0_default # Job name
 # cpu, gpu Setting
-#SBATCH --qos=hpgpu
-#SBATCH --partition=A100-80GB
+# SBATCH --qos=hpgpu
+#SBATCH --partition=L40S
 #SBATCH --exclude=n80
 #SBATCH --gres=gpu:1                   # Number of GPUs (per node)
 #SBATCH --cpus-per-task=8              # CPU cores/threads
 
-#SBATCH --array=1-10%10 # Array range (this creates 20 tasks with IDs from 1 to 20, with max 8 tasks concurrently)
+#SBATCH --array=8-9%10 # Array range (this creates 20 tasks with IDs from 1 to 20, with max 8 tasks concurrently)
 #SBATCH --output=logs/%x-%j_%A_%a.out   # Standard output (%A is replaced by job ID, %a by task ID)
 #SBATCH --error=logs/%x-%j_%A_%a.err    # Standard error
 #SBATCH --time=12:00:00                  # Time limit hrs:min:sec
@@ -51,14 +51,10 @@ DATASET_END=$((DATASET_START + STEP))
 export PRM=Skywork/Skywork-o1-Open-PRM-Qwen-2.5-1.5B
 
 # Temperature settings (comma-separated for argparse)
-TEMPS="0.6,0.8,1.0,1.2"
-TEMP_RATIOS="0.25,0.25,0.25,0.25"
 
 python scripts/test_time_compute.py "$@" \
     --dataset_start=$DATASET_START \
     --dataset_end=$DATASET_END \
     --num_samples=500 \
     --prm_path=$PRM \
-    --temperatures=$TEMPS \
-    --temperature_ratios=$TEMP_RATIOS \
     --push_to_hub=true
