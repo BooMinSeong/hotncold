@@ -13,18 +13,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import math
-import random
+import logging
 import signal
 from collections import defaultdict
 from multiprocessing import Manager
 from typing import Any, Dict, List, Literal
 
 import numpy as np
-from latex2sympy2 import latex2sympy
+from latex2sympy2_extended import latex2sympy
 from sympy import latex, simplify
 
-from .qwen_math_parser import extract_answer, strip_string
+from math_verify import parse, verify
+
+logger = logging.getLogger(__name__)
 
 
 # Timeout exception
@@ -73,18 +74,45 @@ def memoized_canonical_form(expression: str, timeout_seconds: int = 3) -> str:
         shared_cache[expression] = canonical_form  # Cache the result
         return canonical_form
     except TimeoutException:
-        # Fallback: Use a stripped version of the input on timeout
-        fallback = strip_string(expression)
-        shared_cache[expression] = fallback  # Cache the fallback result
-        return fallback
+        return expression
     except Exception:
-        # Fallback: Use a stripped version of the input on other errors
-        fallback = strip_string(expression)
-        shared_cache[expression] = fallback  # Cache the fallback result
-        return fallback
+        return expression
     finally:
         # Ensure the alarm is turned off
         signal.alarm(0)
+
+
+def safe_parse_answer(text: str) -> str:
+    """
+    Safely parse answer from completion text.
+    Splits by '\n\n' and parses only the last chunk (final step).
+
+    Args:
+        text: Completion text to parse
+
+    Returns:
+        Extracted answer string, or empty string if parsing fails
+    """
+    try:
+        # Split by step delimiter and take the last chunk (final answer)
+        chunks = text.split("\n\n")
+        last_chunk = chunks[-1].strip()
+
+        if not last_chunk:
+            return ""
+
+        # Parse returns [sympy_obj, str_fallback] or empty list on failure
+        result = parse(last_chunk)
+
+        if isinstance(result, list) and len(result) >= 2:
+            return result[1]  # Return string fallback
+        elif isinstance(result, list) and len(result) == 1:
+            return str(result[0])  # Convert sympy to string
+        else:
+            return ""
+    except Exception as e:
+        logger.debug(f"Failed to parse answer from text: {text[:100]}... Error: {e}")
+        return ""
 
 
 def subsample_completions(x: Dict[str, List[Any]], n: int) -> Dict[str, List[Any]]:
@@ -107,14 +135,14 @@ def extract_completion_answers(
     x: Dict[str, List[Any]], n: int | None = None
 ) -> Dict[str, List[str]]:
     if n is None:
-        return {"preds": [extract_answer(p, "math") for p in x["completions"]]}
+        return {"preds": [safe_parse_answer(p) for p in x["completions"]]}
     else:
         return {
-            f"preds@{n}": [extract_answer(p, "math") for p in x[f"completions@{n}"]]
+            f"preds@{n}": [safe_parse_answer(p) for p in x[f"completions@{n}"]]
         }
 
 
-def compute_naive_pred(x: Dict[str, List[Any]], n: int) -> Dict[str, List[str]]:
+def compute_naive_pred(x: Dict[str, List[Any]], n: int) -> Dict[str, str]:
     preds = x[f"preds@{n}"]
     scores = x[f"agg_scores@{n}"]
     preds = [
@@ -123,7 +151,7 @@ def compute_naive_pred(x: Dict[str, List[Any]], n: int) -> Dict[str, List[str]]:
     return {f"pred_naive@{n}": "\\boxed{" + preds[0][0] + "}"}
 
 
-def compute_weighted_pred(x: Dict[str, List[Any]], n: int) -> Dict[str, List[str]]:
+def compute_weighted_pred(x: Dict[str, List[Any]], n: int) -> Dict[str, str]:
     preds = x[f"preds@{n}"]
     scores = x[f"agg_scores@{n}"]
     return {
@@ -133,7 +161,7 @@ def compute_weighted_pred(x: Dict[str, List[Any]], n: int) -> Dict[str, List[str
     }
 
 
-def compute_maj_pred(x: Dict[str, List[Any]], n: int) -> Dict[str, List[str]]:
+def compute_maj_pred(x: Dict[str, List[Any]], n: int) -> Dict[str, str]:
     preds = x[f"preds@{n}"]
     return {f"pred_maj@{n}": "\\boxed{" + find_majority_answer(preds) + "}"}
 
@@ -250,10 +278,10 @@ def compute_pass_at_k(x, k):
         raise ValueError("Answer is empty")
 
     # Compute the canonical form of the correct answer
-    canonical_answer = memoized_canonical_form(x["answer"])
+    gold_answer = parse("\\boxed{" + x["answer"] + "}")
 
     # Compute the count of predictions matching the canonical answer
-    c = sum(memoized_canonical_form(pred) == canonical_answer for pred in x["preds"])
+    c = sum(verify(gold_answer, parse("\\boxed{" + pred + "}")) for pred in x["preds"])
 
     # Calculate pass@k
     return {f"pass@{k}": pass_at_k(n, c, k)}

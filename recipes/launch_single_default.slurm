@@ -7,9 +7,9 @@
 #SBATCH --gres=gpu:1                   # Number of GPUs (per node)
 #SBATCH --cpus-per-task=8              # CPU cores/threads
 
-#SBATCH --output=logs/%x-%j.out   # Standard output (%j is replaced by job ID)
-#SBATCH --error=logs/%x-%j.err    # Standard error
-#SBATCH --time=12:00:00                  # Time limit hrs:min:sec
+#SBATCH --output=logs/%x/%A/task_%a.out
+#SBATCH --error=logs/%x/%A/task_%a.err
+#SBATCH --time=12:00:00
 
  '''Usage:
  # Individual run with specific dataset range (default temperature settings)

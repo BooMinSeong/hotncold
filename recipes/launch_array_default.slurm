@@ -8,9 +8,9 @@
 #SBATCH --cpus-per-task=8              # CPU cores/threads
 
 #SBATCH --array=1-10%10 # Array range (this creates 10 tasks with IDs from 1 to 10, with max 10 tasks concurrently)
-#SBATCH --output=logs/%x-%j_%A_%a.out   # Standard output (%A is replaced by job ID, %a by task ID)
-#SBATCH --error=logs/%x-%j_%A_%a.err    # Standard error
-#SBATCH --time=12:00:00                  # Time limit hrs:min:sec
+#SBATCH --output=logs/%x/%A/task_%a.out
+#SBATCH --error=logs/%x/%A/task_%a.err
+#SBATCH --time=12:00:00
 
  '''Usage:
  # Best-of-N on the MATH-500 dataset

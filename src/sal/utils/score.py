@@ -24,9 +24,9 @@ from sal.config import Config
 from sal.utils.math import (
     compute_maj_pred,
     compute_naive_pred,
-    compute_pass_at_k,
     compute_weighted_pred,
     extract_completion_answers,
+    compute_pass_at_k,
     subsample_completions,
 )
 
@@ -86,15 +86,17 @@ def score(dataset: Dataset, config: Config) -> Dataset:
         )
     return dataset
 
+def score_pass_at_k(
+    dataset: Dataset, config: Config
+) -> Dataset:
 
-def score_pass_at_k(dataset: Dataset, config: Config) -> Dataset:
     dataset = dataset.map(
         extract_completion_answers,
         fn_kwargs={"n": None},
         num_proc=config.num_proc,
         desc=f"Extract answers for Pass@k",
     )
-
+    
     subsets = [2**i for i in range(config.n) if 2**i <= config.n]
     for k in subsets:
         dataset = dataset.map(

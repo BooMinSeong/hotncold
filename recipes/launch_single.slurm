@@ -1,15 +1,15 @@
 #!/bin/bash
 #SBATCH --job-name=single_beam # Job name
 # cpu, gpu Setting
-#SBATCH --qos=hpgpu
-#SBATCH --partition=A100-80GB
+# SBATCH --qos=hpgpu
+#SBATCH --partition=L40S
 #SBATCH --exclude=n80
-#SBATCH --gres=gpu:1                   # Number of GPUs (per node)
+#SBATCH --gres=gpu:4                   # Number of GPUs (per node)
 #SBATCH --cpus-per-task=8              # CPU cores/threads
 
-#SBATCH --output=logs/%x-%j.out   # Standard output (%j is replaced by job ID)
-#SBATCH --error=logs/%x-%j.err    # Standard error
-#SBATCH --time=12:00:00                  # Time limit hrs:min:sec
+#SBATCH --output=logs/%x/%A/task_%a.out
+#SBATCH --error=logs/%x/%A/task_%a.err
+#SBATCH --time=12:00:00
 
  '''Usage:
  # Individual run with specific dataset range
@@ -50,7 +50,7 @@ export CXX=$(which g++)
 export PRM=Skywork/Skywork-o1-Open-PRM-Qwen-2.5-1.5B
 
 # Temperature settings (comma-separated for argparse)
-TEMPS="0.6,0.8,1.0,1.2"
+TEMPS="0.4,0.8,1.2,1.6"
 TEMP_RATIOS="0.25,0.25,0.25,0.25"
 
 # Note: dataset_start and dataset_end should be passed as command-line arguments
