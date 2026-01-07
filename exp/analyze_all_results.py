@@ -89,6 +89,52 @@ def analyze_single_dataset(dataset, dataset_name, seed):
     return results_by_method
 
 
+def analyze_pass_at_k(dataset, dataset_name, seed):
+    """
+    Extract pass@k metrics from dataset.
+
+    The dataset should already contain pass@{k} fields computed during generation.
+    This function aggregates them across problems.
+
+    Args:
+        dataset: HuggingFace dataset with pass@k fields
+        dataset_name: Name of dataset (for logging)
+        seed: Seed value (for logging)
+
+    Returns:
+        Dictionary mapping k values to mean pass@k probabilities:
+        {1: 0.45, 2: 0.62, 4: 0.75, ...}
+    """
+    if 'train' in dataset:
+        dataset = dataset['train']
+
+    # Find all pass@k fields
+    pass_k_fields = {}
+    for key in dataset.features.keys():
+        if key.startswith('pass@'):
+            # Extract k value from field name (e.g., 'pass@1' -> 1)
+            try:
+                k = int(key.split('@')[1])
+                pass_k_fields[k] = key
+            except (IndexError, ValueError):
+                continue
+
+    if not pass_k_fields:
+        print(f"  Warning: No pass@k fields found in {dataset_name} (seed {seed})")
+        return {}
+
+    print(f"  Found {len(pass_k_fields)} pass@k fields: {sorted(pass_k_fields.keys())}")
+
+    # Aggregate pass@k values across problems
+    results = {}
+    for k, field_name in pass_k_fields.items():
+        pass_k_values = [row[field_name] for row in dataset if field_name in row]
+        if pass_k_values:
+            results[k] = sum(pass_k_values) / len(pass_k_values)
+
+    return results
+
+
 def plot_configuration_comparison(all_results, approach, method, output_dir, hnc_seeds):
     """
     Compare hnc vs default for same method.
@@ -253,6 +299,165 @@ def plot_scaling_curves(all_results, approach, output_dir, hnc_seeds):
     plt.close()
 
 
+def plot_pass_at_k_curves(all_results, approach, output_dir, hnc_seeds):
+    """
+    Plot pass@k scaling curves comparing HNC vs Default strategies.
+
+    X-axis: k values (log scale)
+    Y-axis: Pass@k probability [0, 1.0]
+    Lines: HNC (solid) vs Default (dashed)
+    Error bands: ± 1 std across seeds
+    """
+    strategies = ['hnc', 'default']
+    default_seeds = [0, 42, 64]
+
+    # Set style
+    sns.set_style("whitegrid")
+
+    # Collect all k values
+    all_k_values = set()
+    for strategy in strategies:
+        dataset_name = f"{strategy}-{approach}"
+        strategy_seeds = hnc_seeds if strategy == 'hnc' else default_seeds
+        if dataset_name in all_results:
+            for seed in strategy_seeds:
+                if seed in all_results[dataset_name] and 'pass@k' in all_results[dataset_name][seed]:
+                    all_k_values.update(all_results[dataset_name][seed]['pass@k'].keys())
+
+    if not all_k_values:
+        print(f"  No pass@k data found for {approach}")
+        return
+
+    k_values = sorted(all_k_values)
+
+    # Prepare data
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    colors = {'hnc': '#1f77b4', 'default': '#ff7f0e'}
+
+    for strategy in strategies:
+        dataset_name = f"{strategy}-{approach}"
+        strategy_seeds = hnc_seeds if strategy == 'hnc' else default_seeds
+
+        if dataset_name not in all_results:
+            continue
+
+        means = []
+        stds = []
+        valid_k = []
+
+        for k in k_values:
+            values = []
+            for seed in strategy_seeds:
+                if seed in all_results[dataset_name]:
+                    if 'pass@k' in all_results[dataset_name][seed]:
+                        if k in all_results[dataset_name][seed]['pass@k']:
+                            values.append(all_results[dataset_name][seed]['pass@k'][k])
+
+            if values:
+                valid_k.append(k)
+                means.append(np.mean(values))
+                stds.append(np.std(values))
+
+        if valid_k:
+            means = np.array(means)
+            stds = np.array(stds)
+
+            # hnc: solid line with markers, default: dashed line
+            if strategy == 'hnc':
+                ax.plot(valid_k, means, 'o-', label=f'{strategy}',
+                       color=colors[strategy], linewidth=2, markersize=8)
+            else:
+                ax.plot(valid_k, means, '--', label=f'{strategy} (baseline)',
+                       color=colors[strategy], linewidth=2)
+
+            ax.fill_between(valid_k, means - stds, means + stds,
+                           alpha=0.2, color=colors[strategy])
+
+    ax.set_xlabel('k (number of samples)', fontsize=12)
+    ax.set_ylabel('Pass@k', fontsize=12)
+    ax.set_title(f'{approach.replace("_", " ").title()}\\nPass@k Scaling Curves',
+                 fontsize=14, fontweight='bold')
+    ax.set_xscale('log')
+    ax.legend(loc='best')
+    ax.grid(True, alpha=0.3, which='both')
+
+    plt.tight_layout()
+    output_path = os.path.join(output_dir, f'{approach}-pass_at_k_curves.png')
+    plt.savefig(output_path, dpi=300, bbox_inches='tight')
+    plt.close()
+
+
+def plot_pass_at_k_comparison(all_results, approach, output_dir, hnc_seeds):
+    """
+    Bar chart comparing pass@k at specific k values (HNC vs Default).
+
+    X-axis: Selected k values [1, 8, 32, 64]
+    Y-axis: Pass@k probability
+    Bars: HNC vs Default side-by-side for each k
+    """
+    strategies = ['hnc', 'default']
+    default_seeds = [0, 42, 64]
+    selected_k = [1, 8, 32, 64]  # Representative k values
+
+    # Set style
+    sns.set_style("whitegrid")
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    colors = {'hnc': '#1f77b4', 'default': '#ff7f0e'}
+    bar_width = 0.35
+    x_positions = np.arange(len(selected_k))
+
+    for idx, strategy in enumerate(strategies):
+        dataset_name = f"{strategy}-{approach}"
+        strategy_seeds = hnc_seeds if strategy == 'hnc' else default_seeds
+
+        if dataset_name not in all_results:
+            continue
+
+        means = []
+        stds = []
+        valid_k = []
+
+        for k in selected_k:
+            values = []
+            for seed in strategy_seeds:
+                if seed in all_results[dataset_name]:
+                    if 'pass@k' in all_results[dataset_name][seed]:
+                        if k in all_results[dataset_name][seed]['pass@k']:
+                            values.append(all_results[dataset_name][seed]['pass@k'][k])
+
+            if values:
+                valid_k.append(k)
+                means.append(np.mean(values))
+                stds.append(np.std(values))
+            else:
+                valid_k.append(k)
+                means.append(0)
+                stds.append(0)
+
+        if means:
+            offset = -bar_width/2 if idx == 0 else bar_width/2
+            ax.bar(x_positions + offset, means, bar_width,
+                   yerr=stds, label=strategy, color=colors[strategy],
+                   capsize=5, alpha=0.8)
+
+    ax.set_xlabel('k (number of samples)', fontsize=12)
+    ax.set_ylabel('Pass@k', fontsize=12)
+    ax.set_title(f'{approach.replace("_", " ").title()}\\nPass@k Comparison',
+                 fontsize=14, fontweight='bold')
+    ax.set_xticks(x_positions)
+    ax.set_xticklabels(selected_k)
+    ax.legend(loc='best')
+    ax.grid(True, alpha=0.3, axis='y')
+
+    plt.tight_layout()
+    output_path = os.path.join(output_dir, f'{approach}-pass_at_k_comparison.png')
+    plt.savefig(output_path, dpi=300, bbox_inches='tight')
+    plt.close()
+
+
 def main():
     # Dataset configurations
     datasets_config = {
@@ -327,9 +532,13 @@ def main():
                     print(f"  Using subset: {matching[0]}")
                     dataset = load_dataset(config['path'], matching[0])
 
-                # Analyze
+                # Analyze pred_* methods
                 results = analyze_single_dataset(dataset, dataset_name, seed)
                 all_results[dataset_name][seed] = results
+
+                # Analyze pass@k
+                pass_at_k_results = analyze_pass_at_k(dataset, dataset_name, seed)
+                all_results[dataset_name][seed]['pass@k'] = pass_at_k_results
 
             except Exception as e:
                 print(f"  Error processing {dataset_name} seed {seed}: {e}")
@@ -353,7 +562,7 @@ def main():
     for approach in approaches:
         print(f"\n  Generating plots for {approach}...")
 
-        # Scaling curves for each approach
+        # Pred_* scaling curves for each approach
         plot_scaling_curves(all_results, approach, output_dir, hnc_seeds)
         print(f"    - Scaling curves: {approach}-scaling_curves.png")
 
@@ -361,6 +570,13 @@ def main():
             # Cross-configuration comparison
             plot_configuration_comparison(all_results, approach, method, output_dir, hnc_seeds)
             print(f"    - Configuration comparison ({method}): {approach}-{method}-hnc_vs_default.png")
+
+        # Pass@k visualizations
+        plot_pass_at_k_curves(all_results, approach, output_dir, hnc_seeds)
+        print(f"    - Pass@k curves: {approach}-pass_at_k_curves.png")
+
+        plot_pass_at_k_comparison(all_results, approach, output_dir, hnc_seeds)
+        print(f"    - Pass@k comparison: {approach}-pass_at_k_comparison.png")
 
     print(f"\nAll visualizations saved to {output_dir}/")
     print("="*80)
@@ -448,6 +664,74 @@ def main():
                     md_lines.append(f"| {n} | {hnc_str} | {default_str} | {diff_str} | {improvement_str} |\n")
 
             md_lines.append("\n")
+
+    # Pass@k Analysis section
+    md_lines.append("## Pass@k Analysis (Model Upper Bound)\n")
+    md_lines.append("\n")
+    md_lines.append("Pass@k measures the probability that at least one of k samples is correct. ")
+    md_lines.append("This represents the theoretical upper bound of model performance.\n")
+    md_lines.append("\n")
+
+    for approach in approaches:
+        md_lines.append(f"### APPROACH: {approach.upper()}\n")
+        md_lines.append("\n")
+
+        # Collect all k values for this approach
+        all_k_values = set()
+        for strategy in strategies:
+            dataset_name = f"{strategy}-{approach}"
+            strategy_seeds = hnc_seeds if strategy == 'hnc' else default_seeds
+            if dataset_name in all_results:
+                for seed in strategy_seeds:
+                    if seed in all_results[dataset_name]:
+                        if 'pass@k' in all_results[dataset_name][seed]:
+                            all_k_values.update(all_results[dataset_name][seed]['pass@k'].keys())
+
+        if not all_k_values:
+            md_lines.append(f"*No pass@k data available for {approach}*\n")
+            md_lines.append("\n")
+            continue
+
+        # Table header
+        md_lines.append("| k | HNC Pass@k | Default Pass@k | Difference | Improvement |\n")
+        md_lines.append("|---|------------|----------------|------------|-------------|\n")
+
+        for k in sorted(all_k_values):
+            hnc_values = []
+            default_values = []
+
+            # Collect HNC values
+            hnc_dataset = f"hnc-{approach}"
+            if hnc_dataset in all_results:
+                for seed in hnc_seeds:
+                    if seed in all_results[hnc_dataset]:
+                        if 'pass@k' in all_results[hnc_dataset][seed]:
+                            if k in all_results[hnc_dataset][seed]['pass@k']:
+                                hnc_values.append(all_results[hnc_dataset][seed]['pass@k'][k])
+
+            # Collect Default values
+            default_dataset = f"default-{approach}"
+            if default_dataset in all_results:
+                for seed in default_seeds:
+                    if seed in all_results[default_dataset]:
+                        if 'pass@k' in all_results[default_dataset][seed]:
+                            if k in all_results[default_dataset][seed]['pass@k']:
+                                default_values.append(all_results[default_dataset][seed]['pass@k'][k])
+
+            if hnc_values or default_values:
+                hnc_mean = np.mean(hnc_values) if hnc_values else 0
+                default_mean = np.mean(default_values) if default_values else 0
+                diff = hnc_mean - default_mean
+                improvement = (diff / default_mean * 100) if default_mean > 0 else 0
+
+                hnc_str = f"{hnc_mean:.4f}" if hnc_values else "N/A"
+                default_str = f"{default_mean:.4f}" if default_values else "N/A"
+                diff_str = f"{diff:+.4f}" if (hnc_values and default_values) else "N/A"
+                improvement_str = f"{improvement:+.2f}%" if (hnc_values and default_values) else "N/A"
+
+                md_lines.append(f"| {k} | {hnc_str} | {default_str} | {diff_str} | {improvement_str} |\n")
+
+        md_lines.append("\n")
 
     # Save markdown report
     report_path = os.path.join(output_dir, 'analysis_report.md')
