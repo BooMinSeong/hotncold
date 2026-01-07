@@ -3,14 +3,15 @@
 # cpu, gpu Setting
 #SBATCH --qos=hpgpu
 #SBATCH --partition=A100-80GB
-#SBATCH --exclude=n80
+#SBATCH --exclude=n79,n80
 #SBATCH --gres=gpu:1                   # Number of GPUs (per node)
 #SBATCH --cpus-per-task=8              # CPU cores/threads
 
 #SBATCH --array=1-10%10 # Array range (this creates 20 tasks with IDs from 1 to 20, with max 8 tasks concurrently)
-#SBATCH --output=logs/%x-%j_%A_%a.out   # Standard output (%A is replaced by job ID, %a by task ID)
-#SBATCH --error=logs/%x-%j_%A_%a.err    # Standard error
-#SBATCH --time=12:00:00                  # Time limit hrs:min:sec
+#SBATCH --output=logs/%x/%A/task_%a.out
+#SBATCH --error=logs/%x/%A/task_%a.err
+#SBATCH --time=12:00:00
+
 
  '''Usage:
  # Best-of-N on the MATH-500 dataset
@@ -51,7 +52,7 @@ DATASET_END=$((DATASET_START + STEP))
 export PRM=Skywork/Skywork-o1-Open-PRM-Qwen-2.5-1.5B
 
 # Temperature settings (comma-separated for argparse)
-TEMPS="0.6,0.8,1.0,1.2"
+TEMPS="0.4,0.8,1.2,1.6"
 TEMP_RATIOS="0.25,0.25,0.25,0.25"
 
 python scripts/test_time_compute.py "$@" \
