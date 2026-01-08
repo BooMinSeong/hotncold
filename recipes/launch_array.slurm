@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=dvts64 # Job name
+#SBATCH --job-name=beam_search_high # Job name
 # cpu, gpu Setting
 #SBATCH --qos=hpgpu
 #SBATCH --partition=A100-80GB
