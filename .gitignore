@@ -164,4 +164,4 @@ cython_debug/
 # results of exp
 data/
 logs/
-*.png/
+*.png
