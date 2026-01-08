@@ -20,7 +20,7 @@ def infer_temperature_from_position(
     Temperature assignment varies by search approach:
     - BoN: Sequential assignment by chunks (position → temps[position // chunk_size])
     - DVTS: Cyclic assignment per beam (position → temps[position % beam_width])
-    - Beam Search: Not supported (raises NotImplementedError)
+    - Beam Search: Sequential assignment by chunks (same as BoN)
 
     Args:
         position: Index in completions list (0-based)
@@ -33,7 +33,6 @@ def infer_temperature_from_position(
         Temperature value for the given position
 
     Raises:
-        NotImplementedError: If approach is 'beam_search' (not supported)
         ValueError: If approach is unknown or position is out of range
 
     Examples:
@@ -79,11 +78,16 @@ def infer_temperature_from_position(
         return temperatures[temp_idx]
 
     elif approach == "beam_search":
-        raise NotImplementedError(
-            "Temperature analysis not supported for beam_search approach. "
-            "Beam search uses multi-iteration tree structure where each completion "
-            "may have used multiple temperatures across iterations."
-        )
+        # Sequential assignment like BoN: divide n into equal chunks
+        # This matches the implementation in beam_search.py where
+        # temp_group = beam_idx // beams_per_temp (sequential grouping)
+        samples_per_temp = n // len(temperatures)
+        if position >= n:
+            raise ValueError(f"Position {position} out of range for n={n}")
+        temp_idx = position // samples_per_temp
+        # Handle edge case where position might exceed due to rounding
+        temp_idx = min(temp_idx, len(temperatures) - 1)
+        return temperatures[temp_idx]
 
     else:
         raise ValueError(
@@ -119,7 +123,6 @@ def assign_temperatures_to_completions(
         }
 
     Raises:
-        NotImplementedError: If approach is 'beam_search'
         ValueError: If completions and scores lengths don't match
     """
     if len(completions) != len(scores):
@@ -223,9 +226,12 @@ def validate_temperature_config(
             pass
 
     elif approach == "beam_search":
-        raise NotImplementedError(
-            "Temperature analysis not supported for beam_search approach"
-        )
+        # For beam search, same validation as BoN (sequential grouping)
+        if n % len(temperatures) != 0:
+            raise ValueError(
+                f"For beam_search approach, n ({n}) must be divisible by "
+                f"number of temperatures ({len(temperatures)})"
+            )
 
     else:
         raise ValueError(f"Unknown approach: {approach}")
@@ -249,9 +255,9 @@ def supports_temperature_analysis(approach: str) -> bool:
         >>> supports_temperature_analysis('dvts')
         True
         >>> supports_temperature_analysis('beam_search')
-        False
+        True
     """
-    return approach.lower() in ["bon", "dvts"]
+    return approach.lower() in ["bon", "dvts", "beam_search"]
 
 
 def get_approach_from_dataset_name(dataset_name: str) -> str:

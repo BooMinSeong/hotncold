@@ -25,13 +25,13 @@ from sal.models.reward_models import PRM
 from sal.utils.score import aggregate_scores
 from sal.utils.temperature import get_temperature_assignment
 
-from .utils import Beam, build_conv, last
+from .utils import Beam, build_conv
 
 logger = logging.getLogger()
 
 
 def _beam_search(batch_of_prompts, config: Config, llm: LLM, prm: PRM) -> list[Beam]:
-    sampling_params = SamplingParams(
+    SamplingParams(
         temperature=config.temperature,
         max_tokens=config.max_tokens,
         top_p=config.top_p,
@@ -84,13 +84,13 @@ def _beam_search(batch_of_prompts, config: Config, llm: LLM, prm: PRM) -> list[B
                     f"Expected {config.n} active beams, but got {len(active_beams)}"
                 )
 
-        # Calculate number of continuations per beam (search)
-        continuations_per_beam = config.n // config.beam_width
-
-        # Get temperature assignment for continuations
+        # Get temperature assignment - each temperature will be used by multiple beams
         temp_config = copy.copy(config)
-        temp_config.n = continuations_per_beam
+        temp_config.n = config.beam_width
         temps = get_temperature_assignment(temp_config)
+
+        # Calculate how many beams should use each temperature
+        beams_per_temp = config.n // config.beam_width
 
         # Prepare prompts and sampling params for each beam and temperature
         prompts = []
@@ -110,9 +110,10 @@ def _beam_search(batch_of_prompts, config: Config, llm: LLM, prm: PRM) -> list[B
                 tokenize=False,
             )
 
-            # Assign temperature based on position within group
-            # beam_idx % continuations_per_beam cycles through temperatures
-            t = temps[beam_idx % continuations_per_beam]
+            # Assign temperature based on beam group
+            # Each temperature is used by beams_per_temp consecutive beams
+            temp_group = beam_idx // beams_per_temp
+            t = temps[temp_group]
 
             prompts.append(templated_conv)
             sampling_params_list.append(
