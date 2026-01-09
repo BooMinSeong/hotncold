@@ -4,7 +4,7 @@
 # SBATCH --qos=hpgpu
 #SBATCH --partition=L40S
 #SBATCH --exclude=n80
-#SBATCH --gres=gpu:1                   # Number of GPUs (per node)
+#SBATCH --gres=gpu:2
 #SBATCH --cpus-per-task=8              # CPU cores/threads
 
 #SBATCH --output=logs/%x/%A/task_%a.out
@@ -56,6 +56,7 @@ export PRM=Skywork/Skywork-o1-Open-PRM-Qwen-2.5-1.5B
 # via --dataset_start, --dataset_end, and --seed when calling this script
 
 python scripts/test_time_compute.py "$@" \
-    --num_samples=500 \
-    --prm_path=$PRM \
-    --push_to_hub=true
+	--gpu_memory_utilization=0.3 \
+    	--num_samples=500 \
+	--prm_path=$PRM \
+	--push_to_hub=true

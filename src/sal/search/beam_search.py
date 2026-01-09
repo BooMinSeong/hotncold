@@ -88,6 +88,7 @@ def _beam_search(batch_of_prompts, config: Config, llm: LLM, prm: PRM) -> list[B
         temp_config = copy.copy(config)
         temp_config.n = config.beam_width
         temps = get_temperature_assignment(temp_config)
+        # beam_width= 4
 
         # Calculate how many beams should use each temperature
         beams_per_temp = config.n // config.beam_width
