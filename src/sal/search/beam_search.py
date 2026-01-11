@@ -140,9 +140,16 @@ def _beam_search(batch_of_prompts, config: Config, llm: LLM, prm: PRM) -> list[B
             beam.current_text += beam.next_texts[0]
             beam.history.append(beam.next_texts[0])
 
-            if beam.stop_reasons[0] == "length" or beam.next_texts[0] == "":
+            if (
+                beam.stop_reasons[0] == "EOS"
+                or beam.stop_reasons[0] == "length"
+                or beam.next_texts[0] == ""
+            ):
                 beam.completed = True
                 completed_beams.append(beam)
+#             if beam.stop_reasons[0] == "length" or beam.next_texts[0] == "":
+#                 beam.completed = True
+#                 completed_beams.append(beam)
             prompts.append(beam.prompt)
             completions.append([beam.current_text])
 
