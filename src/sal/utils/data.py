@@ -30,7 +30,8 @@ def get_dataset(config: Config) -> Dataset:
     dataset = load_dataset(config.dataset_name, split=config.dataset_split)
 
     if config.dataset_start is not None and config.dataset_end is not None:
-        dataset = dataset.select(range(config.dataset_start, config.dataset_end))
+        dataset_end = min(config.dataset_end, len(dataset))
+        dataset = dataset.select(range(config.dataset_start, dataset_end))
     if config.num_samples is not None:
         dataset = dataset.select(range(min(len(dataset), config.num_samples)))
 

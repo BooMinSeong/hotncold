@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=default_seed42 # Job name
+#SBATCH --job-name=default_run # Job name
 # cpu, gpu Setting
 # SBATCH --qos=hpgpu
 #SBATCH --partition=L40S
@@ -7,7 +7,7 @@
 #SBATCH --gres=gpu:1                   # Number of GPUs (per node)
 #SBATCH --cpus-per-task=8              # CPU cores/threads
 
-#SBATCH --array=1-10%10 # Array range (this creates 10 tasks with IDs from 1 to 10, with max 10 tasks concurrently)
+#SBATCH --array=1-1%10 # Array range (this creates 10 tasks with IDs from 1 to 10, with max 10 tasks concurrently)
 #SBATCH --output=logs/%x/%A/task_%a.out
 #SBATCH --error=logs/%x/%A/task_%a.err
 #SBATCH --time=12:00:00
@@ -31,7 +31,6 @@ source .venv/bin/activate
 # 컴파일러 명시 설정
 export CC=$(which gcc)
 export CXX=$(which g++)
-
 
 STEP=50
 TASK_INDEX=$((SLURM_ARRAY_TASK_ID - 1))

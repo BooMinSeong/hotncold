@@ -137,10 +137,10 @@ def analyze_pass_at_k(dataset, dataset_name, seed):
 
 def plot_configuration_comparison(all_results, approach, method, output_dir, hnc_seeds):
     """
-    Compare hnc vs default for same method.
-    Lines with error bands. Default shown as dashed baseline.
+    Compare hnc vs default temperatures for same method.
+    Lines with error bands. Defaults shown as dashed baseline.
     """
-    strategies = ['hnc', 'default']
+    strategies = ['hnc', 'default-T0.8', 'default-T0.4']
     default_seeds = [0, 42, 64]
 
     # Set style
@@ -164,7 +164,7 @@ def plot_configuration_comparison(all_results, approach, method, output_dir, hnc
     # Prepare data
     fig, ax = plt.subplots(figsize=(10, 6))
 
-    colors = {'hnc': '#1f77b4', 'default': '#ff7f0e'}
+    colors = {'hnc': '#1f77b4', 'default-T0.8': '#ff7f0e', 'default-T0.4': '#2ca02c'}
 
     for strategy in strategies:
         dataset_name = f"{strategy}-{approach}"
@@ -219,10 +219,10 @@ def plot_configuration_comparison(all_results, approach, method, output_dir, hnc
 
 def plot_scaling_curves(all_results, approach, output_dir, hnc_seeds):
     """
-    Scaling curve showing all methods for both strategies.
-    X-axis in log scale. Default shown as dashed baseline.
+    Scaling curve showing all methods for all strategies.
+    X-axis in log scale. Defaults shown as dashed baseline.
     """
-    strategies = ['hnc', 'default']
+    strategies = ['hnc', 'default-T0.8', 'default-T0.4']
     methods = ['naive', 'weighted', 'maj']
     default_seeds = [0, 42, 64]
 
@@ -234,7 +234,8 @@ def plot_scaling_curves(all_results, approach, output_dir, hnc_seeds):
     # Color mapping
     colors = {
         'hnc': {'naive': '#1f77b4', 'weighted': '#aec7e8', 'maj': '#3182bd'},
-        'default': {'naive': '#ff7f0e', 'weighted': '#ffbb78', 'maj': '#d62728'}
+        'default-T0.8': {'naive': '#ff7f0e', 'weighted': '#ffbb78', 'maj': '#d62728'},
+        'default-T0.4': {'naive': '#2ca02c', 'weighted': '#98df8a', 'maj': '#ff9896'}
     }
 
     for strategy in strategies:
@@ -305,10 +306,10 @@ def plot_pass_at_k_curves(all_results, approach, output_dir, hnc_seeds):
 
     X-axis: k values (log scale)
     Y-axis: Pass@k probability [0, 1.0]
-    Lines: HNC (solid) vs Default (dashed)
+    Lines: HNC (solid) vs Defaults (dashed)
     Error bands: ± 1 std across seeds
     """
-    strategies = ['hnc', 'default']
+    strategies = ['hnc', 'default-T0.8', 'default-T0.4']
     default_seeds = [0, 42, 64]
 
     # Set style
@@ -333,7 +334,7 @@ def plot_pass_at_k_curves(all_results, approach, output_dir, hnc_seeds):
     # Prepare data
     fig, ax = plt.subplots(figsize=(10, 6))
 
-    colors = {'hnc': '#1f77b4', 'default': '#ff7f0e'}
+    colors = {'hnc': '#1f77b4', 'default-T0.8': '#ff7f0e', 'default-T0.4': '#2ca02c'}
 
     for strategy in strategies:
         dataset_name = f"{strategy}-{approach}"
@@ -390,23 +391,23 @@ def plot_pass_at_k_curves(all_results, approach, output_dir, hnc_seeds):
 
 def plot_pass_at_k_comparison(all_results, approach, output_dir, hnc_seeds):
     """
-    Bar chart comparing pass@k at specific k values (HNC vs Default).
+    Bar chart comparing pass@k at specific k values (HNC vs Defaults).
 
     X-axis: Selected k values [1, 8, 32, 64]
     Y-axis: Pass@k probability
-    Bars: HNC vs Default side-by-side for each k
+    Bars: HNC vs Default-T0.8 vs Default-T0.4 side-by-side for each k
     """
-    strategies = ['hnc', 'default']
+    strategies = ['hnc', 'default-T0.8', 'default-T0.4']
     default_seeds = [0, 42, 64]
     selected_k = [1, 8, 32, 64]  # Representative k values
 
     # Set style
     sns.set_style("whitegrid")
 
-    fig, ax = plt.subplots(figsize=(10, 6))
+    fig, ax = plt.subplots(figsize=(12, 6))
 
-    colors = {'hnc': '#1f77b4', 'default': '#ff7f0e'}
-    bar_width = 0.35
+    colors = {'hnc': '#1f77b4', 'default-T0.8': '#ff7f0e', 'default-T0.4': '#2ca02c'}
+    bar_width = 0.25
     x_positions = np.arange(len(selected_k))
 
     for idx, strategy in enumerate(strategies):
@@ -438,7 +439,8 @@ def plot_pass_at_k_comparison(all_results, approach, output_dir, hnc_seeds):
                 stds.append(0)
 
         if means:
-            offset = -bar_width/2 if idx == 0 else bar_width/2
+            # Position bars: left (-bar_width), center (0), right (+bar_width)
+            offset = (idx - 1) * bar_width
             ax.bar(x_positions + offset, means, bar_width,
                    yerr=stds, label=strategy, color=colors[strategy],
                    capsize=5, alpha=0.8)
@@ -464,7 +466,7 @@ def main():
         'hnc-bon': {
             'path': 'ENSEONG/hnc-Qwen2.5-1.5B-Instruct-bon',
             'filter_strings': []
-            
+
         },
         'hnc-beam_search': {
             'path': 'ENSEONG/hnc-Qwen2.5-1.5B-Instruct-beam_search',
@@ -474,19 +476,34 @@ def main():
             'path': 'ENSEONG/hnc-Qwen2.5-1.5B-Instruct-dvts',
             'filter_strings': []
         },
-        'default-bon': {
+        'default-T0.8-bon': {
             'path': 'ENSEONG/default-Qwen2.5-1.5B-Instruct-bon',
             'subset_template': 'HuggingFaceH4_MATH-500--T-0.8--top_p-1.0--n-64--seed-{seed}--agg_strategy-last',
             'filter_strings': []
         },
-        'default-beam_search': {
+        'default-T0.8-beam_search': {
             'path': 'ENSEONG/default-Qwen2.5-1.5B-Instruct-beam_search',
             'subset_template': 'HuggingFaceH4_MATH-500--T-0.8--top_p-1.0--n-64--m-4--iters-40--look-0--seed-{seed}--agg_strategy--last',
             'filter_strings': []
         },
-        'default-dvts': {
+        'default-T0.8-dvts': {
             'path': 'ENSEONG/default-Qwen2.5-1.5B-Instruct-dvts',
             'subset_template': 'HuggingFaceH4_MATH-500--T-0.8--top_p-1.0--n-64--m-4--iters-40--look-0--seed-{seed}--agg_strategy--last',
+            'filter_strings': []
+        },
+        'default-T0.4-bon': {
+            'path': 'ENSEONG/default-Qwen2.5-1.5B-Instruct-bon',
+            'subset_template': 'HuggingFaceH4_MATH-500--T-0.4--top_p-1.0--n-64--seed-{seed}--agg_strategy-last',
+            'filter_strings': []
+        },
+        'default-T0.4-beam_search': {
+            'path': 'ENSEONG/default-Qwen2.5-1.5B-Instruct-beam_search',
+            'subset_template': 'HuggingFaceH4_MATH-500--T-0.4--top_p-1.0--n-64--m-4--iters-40--look-0--seed-{seed}--agg_strategy--last',
+            'filter_strings': []
+        },
+        'default-T0.4-dvts': {
+            'path': 'ENSEONG/default-Qwen2.5-1.5B-Instruct-dvts',
+            'subset_template': 'HuggingFaceH4_MATH-500--T-0.4--top_p-1.0--n-64--m-4--iters-40--look-0--seed-{seed}--agg_strategy--last',
             'filter_strings': []
         }
     }
@@ -546,16 +563,16 @@ def main():
 
     # Group by approach type
     approaches = ['bon', 'beam_search', 'dvts']
-    strategies = ['hnc', 'default']
+    strategies = ['hnc', 'default-T0.8', 'default-T0.4']
 
     # Generate visualizations
     print("\n\n" + "="*80)
     print("GENERATING VISUALIZATIONS")
     print("="*80)
 
-    # Create output directory with seed information
+    # Create output directory with seed and temperature information
     seed_str = '-'.join(map(str, hnc_seeds))
-    output_dir = f"exp/results_analysis_seeds_{seed_str}"
+    output_dir = f"exp/results_analysis_seeds_{seed_str}_T0.8_T0.4"
     os.makedirs(output_dir, exist_ok=True)
     print(f"Output directory: {output_dir}")
 
@@ -598,7 +615,7 @@ def main():
     md_lines.append("\n")
 
     # Cross-configuration comparison section
-    md_lines.append("## Cross-Configuration Comparison (HNC vs DEFAULT)\n")
+    md_lines.append("## Cross-Configuration Comparison (HNC vs DEFAULT Temperatures)\n")
     md_lines.append("\n")
 
     for approach in approaches:
@@ -627,12 +644,13 @@ def main():
                 continue
 
             # Table header
-            md_lines.append("| n | HNC Acc | Default Acc | Difference | Improvement |\n")
-            md_lines.append("|---|---------|-------------|------------|-------------|\n")
+            md_lines.append("| n | HNC Acc | Default-T0.8 Acc | Default-T0.4 Acc | HNC vs T0.8 | HNC vs T0.4 |\n")
+            md_lines.append("|---|---------|------------------|------------------|-------------|-------------|\n")
 
             for n in sorted(all_n_values):
                 hnc_values = []
-                default_values = []
+                default_t08_values = []
+                default_t04_values = []
 
                 # Collect HNC values
                 hnc_dataset = f"hnc-{approach}"
@@ -642,26 +660,39 @@ def main():
                             if n in all_results[hnc_dataset][seed][method]:
                                 hnc_values.append(all_results[hnc_dataset][seed][method][n])
 
-                # Collect Default values
-                default_dataset = f"default-{approach}"
-                if default_dataset in all_results:
+                # Collect Default-T0.8 values
+                default_t08_dataset = f"default-T0.8-{approach}"
+                if default_t08_dataset in all_results:
                     for seed in default_seeds:
-                        if seed in all_results[default_dataset]:
-                            if n in all_results[default_dataset][seed][method]:
-                                default_values.append(all_results[default_dataset][seed][method][n])
+                        if seed in all_results[default_t08_dataset]:
+                            if n in all_results[default_t08_dataset][seed][method]:
+                                default_t08_values.append(all_results[default_t08_dataset][seed][method][n])
 
-                if hnc_values or default_values:
+                # Collect Default-T0.4 values
+                default_t04_dataset = f"default-T0.4-{approach}"
+                if default_t04_dataset in all_results:
+                    for seed in default_seeds:
+                        if seed in all_results[default_t04_dataset]:
+                            if n in all_results[default_t04_dataset][seed][method]:
+                                default_t04_values.append(all_results[default_t04_dataset][seed][method][n])
+
+                if hnc_values or default_t08_values or default_t04_values:
                     hnc_mean = np.mean(hnc_values) if hnc_values else 0
-                    default_mean = np.mean(default_values) if default_values else 0
-                    diff = hnc_mean - default_mean
-                    improvement = (diff / default_mean * 100) if default_mean > 0 else 0
+                    default_t08_mean = np.mean(default_t08_values) if default_t08_values else 0
+                    default_t04_mean = np.mean(default_t04_values) if default_t04_values else 0
+
+                    diff_t08 = hnc_mean - default_t08_mean
+                    diff_t04 = hnc_mean - default_t04_mean
+                    improvement_t08 = (diff_t08 / default_t08_mean * 100) if default_t08_mean > 0 else 0
+                    improvement_t04 = (diff_t04 / default_t04_mean * 100) if default_t04_mean > 0 else 0
 
                     hnc_str = f"{hnc_mean:.4f}" if hnc_values else "N/A"
-                    default_str = f"{default_mean:.4f}" if default_values else "N/A"
-                    diff_str = f"{diff:+.4f}" if (hnc_values and default_values) else "N/A"
-                    improvement_str = f"{improvement:+.2f}%" if (hnc_values and default_values) else "N/A"
+                    default_t08_str = f"{default_t08_mean:.4f}" if default_t08_values else "N/A"
+                    default_t04_str = f"{default_t04_mean:.4f}" if default_t04_values else "N/A"
+                    diff_t08_str = f"{diff_t08:+.4f} ({improvement_t08:+.2f}%)" if (hnc_values and default_t08_values) else "N/A"
+                    diff_t04_str = f"{diff_t04:+.4f} ({improvement_t04:+.2f}%)" if (hnc_values and default_t04_values) else "N/A"
 
-                    md_lines.append(f"| {n} | {hnc_str} | {default_str} | {diff_str} | {improvement_str} |\n")
+                    md_lines.append(f"| {n} | {hnc_str} | {default_t08_str} | {default_t04_str} | {diff_t08_str} | {diff_t04_str} |\n")
 
             md_lines.append("\n")
 
@@ -693,12 +724,13 @@ def main():
             continue
 
         # Table header
-        md_lines.append("| k | HNC Pass@k | Default Pass@k | Difference | Improvement |\n")
-        md_lines.append("|---|------------|----------------|------------|-------------|\n")
+        md_lines.append("| k | HNC Pass@k | Default-T0.8 Pass@k | Default-T0.4 Pass@k | HNC vs T0.8 | HNC vs T0.4 |\n")
+        md_lines.append("|---|------------|---------------------|---------------------|-------------|-------------|\n")
 
         for k in sorted(all_k_values):
             hnc_values = []
-            default_values = []
+            default_t08_values = []
+            default_t04_values = []
 
             # Collect HNC values
             hnc_dataset = f"hnc-{approach}"
@@ -709,27 +741,41 @@ def main():
                             if k in all_results[hnc_dataset][seed]['pass@k']:
                                 hnc_values.append(all_results[hnc_dataset][seed]['pass@k'][k])
 
-            # Collect Default values
-            default_dataset = f"default-{approach}"
-            if default_dataset in all_results:
+            # Collect Default-T0.8 values
+            default_t08_dataset = f"default-T0.8-{approach}"
+            if default_t08_dataset in all_results:
                 for seed in default_seeds:
-                    if seed in all_results[default_dataset]:
-                        if 'pass@k' in all_results[default_dataset][seed]:
-                            if k in all_results[default_dataset][seed]['pass@k']:
-                                default_values.append(all_results[default_dataset][seed]['pass@k'][k])
+                    if seed in all_results[default_t08_dataset]:
+                        if 'pass@k' in all_results[default_t08_dataset][seed]:
+                            if k in all_results[default_t08_dataset][seed]['pass@k']:
+                                default_t08_values.append(all_results[default_t08_dataset][seed]['pass@k'][k])
 
-            if hnc_values or default_values:
+            # Collect Default-T0.4 values
+            default_t04_dataset = f"default-T0.4-{approach}"
+            if default_t04_dataset in all_results:
+                for seed in default_seeds:
+                    if seed in all_results[default_t04_dataset]:
+                        if 'pass@k' in all_results[default_t04_dataset][seed]:
+                            if k in all_results[default_t04_dataset][seed]['pass@k']:
+                                default_t04_values.append(all_results[default_t04_dataset][seed]['pass@k'][k])
+
+            if hnc_values or default_t08_values or default_t04_values:
                 hnc_mean = np.mean(hnc_values) if hnc_values else 0
-                default_mean = np.mean(default_values) if default_values else 0
-                diff = hnc_mean - default_mean
-                improvement = (diff / default_mean * 100) if default_mean > 0 else 0
+                default_t08_mean = np.mean(default_t08_values) if default_t08_values else 0
+                default_t04_mean = np.mean(default_t04_values) if default_t04_values else 0
+
+                diff_t08 = hnc_mean - default_t08_mean
+                diff_t04 = hnc_mean - default_t04_mean
+                improvement_t08 = (diff_t08 / default_t08_mean * 100) if default_t08_mean > 0 else 0
+                improvement_t04 = (diff_t04 / default_t04_mean * 100) if default_t04_mean > 0 else 0
 
                 hnc_str = f"{hnc_mean:.4f}" if hnc_values else "N/A"
-                default_str = f"{default_mean:.4f}" if default_values else "N/A"
-                diff_str = f"{diff:+.4f}" if (hnc_values and default_values) else "N/A"
-                improvement_str = f"{improvement:+.2f}%" if (hnc_values and default_values) else "N/A"
+                default_t08_str = f"{default_t08_mean:.4f}" if default_t08_values else "N/A"
+                default_t04_str = f"{default_t04_mean:.4f}" if default_t04_values else "N/A"
+                diff_t08_str = f"{diff_t08:+.4f} ({improvement_t08:+.2f}%)" if (hnc_values and default_t08_values) else "N/A"
+                diff_t04_str = f"{diff_t04:+.4f} ({improvement_t04:+.2f}%)" if (hnc_values and default_t04_values) else "N/A"
 
-                md_lines.append(f"| {k} | {hnc_str} | {default_str} | {diff_str} | {improvement_str} |\n")
+                md_lines.append(f"| {k} | {hnc_str} | {default_t08_str} | {default_t04_str} | {diff_t08_str} | {diff_t04_str} |\n")
 
         md_lines.append("\n")
 
