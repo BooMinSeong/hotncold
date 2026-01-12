@@ -24,7 +24,6 @@ classifiers = [
 dependencies = [
     "accelerate",
     "pebble",
-    "latex2sympy2==1.9.1",
     "word2number",
     "transformers>=4.47.0",
     "fastapi",
