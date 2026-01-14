@@ -17,7 +17,7 @@ import dataclasses
 import os
 import sys
 from dataclasses import dataclass
-from typing import Any, List, NewType, Optional, Tuple, Union, get_origin, get_args
+from typing import Any, List, NewType, Optional, Tuple, Union, get_args, get_origin
 
 from transformers import HfArgumentParser
 

@@ -85,9 +85,7 @@ def _beam_search(batch_of_prompts, config: Config, llm: LLM, prm: PRM) -> list[B
                 )
 
         # Get temperature assignment - each temperature will be used by multiple beams
-        temp_config = copy.copy(config)
-        temp_config.n = config.beam_width
-        temps = get_temperature_assignment(temp_config)
+        temps = get_temperature_assignment(config)
         # beam_width= 4
 
         # Calculate how many beams should use each temperature
@@ -147,9 +145,9 @@ def _beam_search(batch_of_prompts, config: Config, llm: LLM, prm: PRM) -> list[B
             ):
                 beam.completed = True
                 completed_beams.append(beam)
-#             if beam.stop_reasons[0] == "length" or beam.next_texts[0] == "":
-#                 beam.completed = True
-#                 completed_beams.append(beam)
+            #             if beam.stop_reasons[0] == "length" or beam.next_texts[0] == "":
+            #                 beam.completed = True
+            #                 completed_beams.append(beam)
             prompts.append(beam.prompt)
             completions.append([beam.current_text])
 

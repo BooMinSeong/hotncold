@@ -14,7 +14,6 @@
 # limitations under the License.
 
 
-import copy
 import logging
 from collections import defaultdict
 
@@ -71,9 +70,7 @@ def _dvts(batch_of_prompts: list[str], config: Config, llm: LLM, prm: PRM):
 
         # Get temperature assignment for diverse paths
         # Each beam generates beam_width diverse paths
-        temp_config = copy.copy(config)
-        temp_config.n = config.beam_width
-        temps = get_temperature_assignment(temp_config)
+        temps = get_temperature_assignment(config)
 
         # Prepare prompts and sampling params for each beam's diverse paths
         prompts = []
@@ -173,9 +170,9 @@ def _dvts(batch_of_prompts: list[str], config: Config, llm: LLM, prm: PRM):
                 # stopped on EOS, prune
                 beam.pruned = True
 
-#             if beam.next_texts[best_score_ind] == "":
-#                 # stopped on EOS, prune
-#                 beam.pruned = True
+        #             if beam.next_texts[best_score_ind] == "":
+        #                 # stopped on EOS, prune
+        #                 beam.pruned = True
 
         # filter / prune
         for beam in gen_beams:

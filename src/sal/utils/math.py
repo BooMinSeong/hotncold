@@ -21,9 +21,8 @@ from typing import Any, Dict, List, Literal
 
 import numpy as np
 from latex2sympy2_extended import latex2sympy
-from sympy import latex, simplify
-
 from math_verify import parse, verify
+from sympy import latex, simplify
 
 logger = logging.getLogger(__name__)
 
@@ -137,9 +136,7 @@ def extract_completion_answers(
     if n is None:
         return {"preds": [safe_parse_answer(p) for p in x["completions"]]}
     else:
-        return {
-            f"preds@{n}": [safe_parse_answer(p) for p in x[f"completions@{n}"]]
-        }
+        return {f"preds@{n}": [safe_parse_answer(p) for p in x[f"completions@{n}"]]}
 
 
 def compute_naive_pred(x: Dict[str, List[Any]], n: int) -> Dict[str, str]:

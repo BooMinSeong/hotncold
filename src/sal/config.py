@@ -85,24 +85,15 @@ class Config:
                     )
                 if not math.isclose(sum(self.temperature_ratios), 1.0, abs_tol=1e-6):
                     raise ValueError("temperature_ratios must sum to 1.0")
-            else:
-                # Equal distribution - n must be divisible
-                if self.n % len(self.temperatures) != 0:
-                    raise ValueError(
-                        f"n ({self.n}) must be divisible by temperatures count"
-                    )
+
+        # For best_of_n, treat n independent completions as n beams for consistency
+        if self.approach == "best_of_n":
+            self.beam_width = self.n
 
         if self.approach == "dvts":
             if self.n % self.beam_width != 0:
                 raise ValueError("n should be a multiple of beam_width")
             self.n_beams = self.n // self.beam_width
-
-            # DVTS specific validation for temperatures
-            if self.temperatures is not None and self.temperature_ratios is None:
-                if self.n_beams % len(self.temperatures) != 0:
-                    raise ValueError(
-                        f"n_beams ({self.n_beams}) must be divisible by temperatures count for DVTS"
-                    )
 
         if self.approach == "beam_search":
             # TODO: implemented a batched version
