@@ -2,8 +2,9 @@
 
 SEEDS=(0 42 64)
 METHOD_NAMES=("bon" "beam_search" "dvts")
-TEMPERATURE=0.8
+TEMPERATURE=0.4
 DATASET_NAME="math-ai/aime25" # "HuggingFaceH4/MATH-500"
+MODEL_NAME="Qwen2.5-3B-Instruct"
 
 # Default parameters from config
 TOP_P=1.0
@@ -14,7 +15,7 @@ LOOKAHEAD=0
 for METHOD_NAME in "${METHOD_NAMES[@]}"; do
     # 각 seed에 대해 merge 실행
     for SEED in "${SEEDS[@]}"; do
-        DATASET_REPO="ENSEONG/default-${DATASET_NAME##*/}-Qwen2.5-3B-Instruct-$METHOD_NAME"
+        DATASET_REPO="ENSEONG/default-${DATASET_NAME##*/}-$MODEL_NAME-$METHOD_NAME"
 
         # best_of_n는 look 파라미터가 없음
         if [ "$METHOD_NAME" = "bon" ]; then

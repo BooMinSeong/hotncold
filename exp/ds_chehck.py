@@ -1,8 +1,20 @@
 import argparse
 import re
 import sys
+from dataclasses import dataclass
+from typing import List, Tuple, Optional
 from huggingface_hub import list_repo_refs
 from huggingface_hub.utils import RepositoryNotFoundError
+
+
+@dataclass
+class DatasetCheckResult:
+    """Result of checking a dataset's coverage."""
+    dataset_name: str
+    filters: List[str]
+    coverage_pct: float
+    missing_ranges: List[Tuple[int, int]]  # [(start, end), ...]
+    status: str  # "OK", "MISSING", "NOT_FOUND", "NO_BRANCHES"
 
 
 def parse_chunk_range(branch_name):
@@ -72,6 +84,83 @@ def print_oneline(dataset_name, filters, coverage_pct, missing, status="OK"):
         print(f"{dataset_name} | {filter_display} | {coverage_pct:.1f}% | MISSING: {missing_str}")
     else:
         print(f"{dataset_name} | {filter_display} | {coverage_pct:.1f}% | OK")
+
+
+def check_dataset(
+    dataset_name: str,
+    filters: Optional[List[str]] = None,
+    total: int = 500
+) -> DatasetCheckResult:
+    """
+    Check dataset coverage and return structured result.
+
+    Args:
+        dataset_name: HuggingFace dataset name (e.g., org/dataset-name)
+        filters: List of filter strings for branch names (AND condition)
+        total: Total range to check for gaps (default: 500)
+
+    Returns:
+        DatasetCheckResult with coverage info and missing ranges
+    """
+    filters = filters or []
+
+    # Get branch information
+    try:
+        refs = list_repo_refs(dataset_name, repo_type="dataset")
+    except RepositoryNotFoundError:
+        return DatasetCheckResult(
+            dataset_name=dataset_name,
+            filters=filters,
+            coverage_pct=0.0,
+            missing_ranges=[],
+            status="NOT_FOUND"
+        )
+
+    # Extract branch names
+    branch_names = [branch.name for branch in refs.branches]
+
+    # Filter branches if filters provided
+    if filters:
+        filtered_branches = [
+            name for name in branch_names
+            if all(f in name for f in filters)
+        ]
+    else:
+        filtered_branches = branch_names
+
+    # Parse chunk ranges
+    chunk_ranges = []
+    for name in filtered_branches:
+        chunk_range = parse_chunk_range(name)
+        if chunk_range:
+            chunk_ranges.append(chunk_range)
+
+    # Check for no matching branches
+    if not filtered_branches or not chunk_ranges:
+        return DatasetCheckResult(
+            dataset_name=dataset_name,
+            filters=filters,
+            coverage_pct=0.0,
+            missing_ranges=[(0, total)],
+            status="NO_BRANCHES"
+        )
+
+    # Find missing ranges
+    missing = find_missing_ranges(chunk_ranges, total)
+    total_missing = sum(e - s for s, e in missing)
+    covered = total - total_missing
+    coverage_pct = (covered / total) * 100
+
+    # Determine status
+    status = "OK" if not missing else "MISSING"
+
+    return DatasetCheckResult(
+        dataset_name=dataset_name,
+        filters=filters,
+        coverage_pct=coverage_pct,
+        missing_ranges=missing,
+        status=status
+    )
 
 
 def main():

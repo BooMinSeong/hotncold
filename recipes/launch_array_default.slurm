@@ -1,36 +1,38 @@
 #!/bin/bash
 #SBATCH --job-name=default_run # Job name
 # cpu, gpu Setting
-#SBATCH --qos=hpgpu
-#SBATCH --partition=A100-80GB
+# SBATCH --qos=hpgpu
+#SBATCH --partition=L40S,RTX6000ADA
 #SBATCH --exclude=n80
 #SBATCH --gres=gpu:1                   # Number of GPUs (per node)
-#SBATCH --cpus-per-task=8              # CPU cores/threads
+#SBATCH --cpus-per-task=4              # CPU cores/threads
 
-#SBATCH --array=1-1%10 # Array range (this creates 10 tasks with IDs from 1 to 10, with max 10 tasks concurrently)
+#SBATCH --array=1-10%10 # Array range (this creates 10 tasks with IDs from 1 to 10, with max 10 tasks concurrently)
 #SBATCH --output=logs/%x/%A/task_%a.out
 #SBATCH --error=logs/%x/%A/task_%a.err
 #SBATCH --time=12:00:00
 
- '''Usage:
- # Best-of-N on the MATH-500 dataset
- 
- sbatch recipes/launch_array.slurm recipes/Llama-3.2-1B-Instruct/best_of_n.yaml \
-     --hub_dataset_id=<YOUR_ORG>/Llama-3.2-1B-Instruct-bon-completions
- '''
+#  '''Usage:
+#  # Best-of-N on the MATH-500 dataset
+#  
+#  sbatch recipes/launch_array.slurm recipes/Llama-3.2-1B-Instruct/best_of_n.yaml \
+#      --hub_dataset_id=<YOUR_ORG>/Llama-3.2-1B-Instruct-bon-completions
+#  '''
 
 # 모듈 설정
 module purge
 module load gnu12/12.2.0
 module load cuda/12.6
-
+echo "module load complete"
 # 환경 설정
 source ~/.bashrc
 source .venv/bin/activate
+echo "venv activate complete"
 
 # 컴파일러 명시 설정
 export CC=$(which gcc)
 export CXX=$(which g++)
+echo "compiler set compelete"
 
 STEP=50
 TASK_INDEX=$((SLURM_ARRAY_TASK_ID - 1))

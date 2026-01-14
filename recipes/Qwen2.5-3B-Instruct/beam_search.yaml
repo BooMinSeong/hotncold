@@ -1,0 +1,10 @@
+# refer to src/sal/config.py for more options
+
+model_path: Qwen/Qwen2.5-3B-Instruct
+custom_chat_template: null
+filter_duplicates: true
+approach: beam_search
+n: 64
+search_batch_size: 1  # DO NOT CHANGE!
+prm_batch_size: 1
+seed: 42

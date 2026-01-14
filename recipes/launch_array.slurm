@@ -13,12 +13,12 @@
 #SBATCH --time=12:00:00
 
 
- '''Usage:
- # Best-of-N on the MATH-500 dataset
- 
- sbatch recipes/launch_array.slurm recipes/Llama-3.2-1B-Instruct/best_of_n.yaml \
-     --hub_dataset_id=<YOUR_ORG>/Llama-3.2-1B-Instruct-bon-completions
- '''
+#  '''Usage:
+#  # Best-of-N on the MATH-500 dataset
+#  
+#  sbatch recipes/launch_array.slurm recipes/Llama-3.2-1B-Instruct/best_of_n.yaml \
+#      --hub_dataset_id=<YOUR_ORG>/Llama-3.2-1B-Instruct-bon-completions
+#  '''
 
 # 모듈 설정
 module purge
