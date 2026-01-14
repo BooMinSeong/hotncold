@@ -109,7 +109,51 @@ Command-line arguments override config values.
 - `peiyi9979/math-shepherd-mistral-7b-prm`
 - `Skywork/Skywork-o1-Open-PRM-Qwen-2.5-1.5B`
 - `Skywork/Skywork-o1-Open-PRM-Qwen-2.5-7B`
+- `Qwen/Qwen2.5-Math-PRM-7B` (supports vLLM backend)
 - Custom PRMs trained with TRL (see `recipes/training/`)
+
+### PRM Backend Options
+
+The project supports three PRM backends via `--prm_backend`:
+
+| Backend | Description | Use Case |
+|---------|-------------|----------|
+| `transformers` | HuggingFace Transformers (default) | Single GPU, shared memory with LLM |
+| `vllm_offline` | vLLM offline inference | Dual GPU setup, LLM and PRM on separate GPUs |
+| `vllm_api` | vLLM API server | Cluster environments, separate PRM server job |
+
+#### vLLM API Mode (Recommended for clusters)
+
+```bash
+# Option 1: Automatic orchestration (recommended)
+./run_with_prm_server.sh recipes/Qwen2.5-3B-Instruct/best_of_n.yaml
+
+# Option 2: Manual setup
+# Terminal 1: Start PRM server
+python scripts/start_prm_server.py --model Qwen/Qwen2.5-Math-PRM-7B --port 8001
+
+# Terminal 2: Run compute with API backend
+python scripts/test_time_compute.py $CONFIG \
+    --prm_backend=vllm_api \
+    --prm_api_base_url=http://localhost:8001
+```
+
+#### vLLM Offline Mode (Dual GPU)
+
+```bash
+# Requires 2+ GPUs - LLM on GPU 0, PRM on GPU 1
+python scripts/test_time_compute.py $CONFIG \
+    --prm_backend=vllm_offline \
+    --prm_path=Qwen/Qwen2.5-Math-PRM-7B \
+    --gpu_memory_utilization=0.5 \
+    --prm_gpu_memory_utilization=0.4
+```
+
+#### Slurm Templates for vLLM Backend
+
+- `recipes/launch_prm_server.slurm`: PRM server job (24h, 1 GPU)
+- `recipes/launch_array_api.slurm`: Compute jobs connecting to PRM server
+- `recipes/launch_dual_gpu.slurm`: Dual GPU offline mode (2 GPUs)
 
 ## Important Notes
 

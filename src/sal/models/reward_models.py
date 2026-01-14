@@ -13,8 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
+import logging
+import time
 from itertools import accumulate
+from pathlib import Path
 
+import httpx
 import torch
 import torch.nn.functional as F
 from transformers import (
@@ -26,6 +31,8 @@ from transformers import (
 )
 
 from sal.config import Config
+
+logger = logging.getLogger(__name__)
 from sal.models.skywork_o1_prm.io_utils import (
     derive_step_rewards,
     prepare_batch_input_for_model,
@@ -81,6 +88,10 @@ class PRM:
         self, questions: list[str], outputs: list[list[str]]
     ) -> list[list[float]]:
         raise NotImplementedError
+
+    def close(self) -> None:
+        """Clean up resources. Override in subclasses if needed."""
+        pass
 
 
 class MathShepherd(PRM):
@@ -449,7 +460,342 @@ class Qwen_2_5_Math_7B(Qwen_2_5_Math):
         return Qwen_2_5_Math._load_model_and_tokenizer(prm_model_path, **model_kwargs)
 
 
-def load_prm(config: Config) -> PRM:
+class VLLMRewardBase:
+    """Base class for vLLM-based reward models."""
+
+    def __init__(self, search_config: Config):
+        self.search_config = search_config
+        self._tokenizer = None
+
+    def _prepare_inputs_qwen(
+        self, questions: list[str], outputs: list[list[str]]
+    ) -> tuple[list[str], list[int]]:
+        """
+        Prepare formatted inputs for Qwen PRM model.
+        Returns (formatted_texts, lengths) where lengths tracks
+        how many completions per question for reshaping outputs.
+        """
+        formatted_texts = []
+        lengths = []
+
+        for question, answers in zip(questions, outputs):
+            for answer in answers:
+                messages = [
+                    {
+                        "role": "system",
+                        "content": "Please reason step by step, and put your final answer within \\boxed{}.",
+                    },
+                    {"role": "user", "content": question},
+                    {
+                        "role": "assistant",
+                        "content": answer.replace("\n\n", "<extra_0>") + "<extra_0>",
+                    },
+                ]
+                formatted_text = self._tokenizer.apply_chat_template(
+                    messages, tokenize=False, add_generation_prompt=False
+                )
+                formatted_texts.append(formatted_text)
+            lengths.append(len(answers))
+
+        return formatted_texts, lengths
+
+    def _reshape_scores(
+        self, flat_scores: list[list[float]], lengths: list[int]
+    ) -> list[list[list[float]]]:
+        """Reshape flat scores back to [questions][completions][steps] structure."""
+        result = []
+        idx = 0
+        for length in lengths:
+            result.append(flat_scores[idx : idx + length])
+            idx += length
+        return result
+
+    def score(
+        self, questions: list[str], outputs: list[list[str]]
+    ) -> list[list[list[float]]]:
+        raise NotImplementedError
+
+    def close(self) -> None:
+        """Clean up resources. Override in subclasses if needed."""
+        pass
+
+
+class VLLMRewardOffline(VLLMRewardBase):
+    """
+    vLLM-based PRM using local offline inference.
+    Designed for dual-GPU setups where LLM and PRM run on separate GPUs.
+    """
+
+    def __init__(self, search_config: Config, **model_kwargs):
+        super().__init__(search_config)
+        self._load_model(**model_kwargs)
+
+    def _load_model(self, **model_kwargs):
+        from vllm import LLM
+
+        self._tokenizer = AutoTokenizer.from_pretrained(
+            self.search_config.prm_path, trust_remote_code=True
+        )
+
+        # Configure vLLM for reward model
+        self.llm = LLM(
+            model=self.search_config.prm_path,
+            task="reward",
+            gpu_memory_utilization=self.search_config.prm_gpu_memory_utilization,
+            tensor_parallel_size=self.search_config.prm_tensor_parallel_size,
+            trust_remote_code=True,
+            dtype="bfloat16",
+            **model_kwargs,
+        )
+
+        self.step_sep_id = self._tokenizer.encode("<extra_0>")[0]
+
+    def score(
+        self, questions: list[str], outputs: list[list[str]]
+    ) -> list[list[list[float]]]:
+        """Score using vLLM offline inference."""
+        formatted_texts, lengths = self._prepare_inputs_qwen(questions, outputs)
+
+        # Use vLLM's reward scoring
+        results = self.llm.encode(formatted_texts)
+
+        # Extract step-level scores
+        flat_scores = self._extract_step_scores(results, formatted_texts)
+
+        return self._reshape_scores(flat_scores, lengths)
+
+    def _extract_step_scores(
+        self, results, formatted_texts: list[str]
+    ) -> list[list[float]]:
+        """
+        Extract step-level scores from vLLM encode results.
+        Model-specific logic for extracting scores at step separator positions.
+        """
+        step_scores = []
+
+        for result, text in zip(results, formatted_texts):
+            input_ids = self._tokenizer.encode(text)
+            step_positions = [
+                i for i, tid in enumerate(input_ids) if tid == self.step_sep_id
+            ]
+
+            if hasattr(result.outputs, "data"):
+                scores_tensor = result.outputs.data
+                if scores_tensor.dim() == 2:
+                    # Token classification output: [num_tokens, num_classes]
+                    # Use softmax and take positive class probability
+                    probs = F.softmax(scores_tensor, dim=-1)
+                    scores = [
+                        float(probs[pos, 1]) if pos < len(probs) else 0.0
+                        for pos in step_positions
+                    ]
+                else:
+                    # Single score per position
+                    scores = [
+                        float(scores_tensor[pos]) if pos < len(scores_tensor) else 0.0
+                        for pos in step_positions
+                    ]
+                step_scores.append(scores)
+            else:
+                # Fallback: use uniform scores
+                step_scores.append([1.0] * len(step_positions))
+
+        return step_scores
+
+    def close(self):
+        """Clean up vLLM resources."""
+        if hasattr(self, "llm"):
+            del self.llm
+            torch.cuda.empty_cache()
+
+
+class VLLMRewardAPI(VLLMRewardBase):
+    """
+    vLLM-based PRM using remote API server.
+    Designed for cluster setups where PRM runs as a separate job.
+    """
+
+    def __init__(self, search_config: Config, **model_kwargs):
+        super().__init__(search_config)
+        self._setup_client()
+        self._load_tokenizer()
+
+    def _setup_client(self):
+        """Initialize HTTP client and resolve service endpoint."""
+        self.base_urls = self._resolve_service_urls()
+        self.clients = [
+            httpx.Client(
+                base_url=url,
+                timeout=self.search_config.prm_api_timeout,
+            )
+            for url in self.base_urls
+        ]
+        self._wait_for_servers()
+
+    def _resolve_service_urls(self) -> list[str]:
+        """Resolve API URLs from config or service discovery file."""
+        if self.search_config.prm_api_base_urls:
+            return self.search_config.prm_api_base_urls
+
+        if self.search_config.prm_api_base_url:
+            return [self.search_config.prm_api_base_url]
+
+        # Service discovery from file
+        service_file = Path(self.search_config.prm_service_file)
+        max_wait = 300  # 5 minutes
+        start_time = time.time()
+
+        while time.time() - start_time < max_wait:
+            if service_file.exists():
+                with open(service_file) as f:
+                    service_info = json.load(f)
+                return [f"http://{service_info['host']}:{service_info['port']}"]
+            logger.info(f"Waiting for service file: {service_file}")
+            time.sleep(5)
+
+        raise TimeoutError(
+            f"Service discovery file {service_file} not found after {max_wait}s"
+        )
+
+    def _wait_for_servers(self, timeout: float = 300.0):
+        """Wait for vLLM servers to be ready."""
+        start_time = time.time()
+
+        for i, (client, url) in enumerate(zip(self.clients, self.base_urls)):
+            while time.time() - start_time < timeout:
+                try:
+                    response = client.get("/health")
+                    if response.status_code == 200:
+                        logger.info(f"vLLM server {i} at {url} is ready")
+                        break
+                except httpx.RequestError:
+                    pass
+                time.sleep(5)
+            else:
+                raise TimeoutError(f"vLLM server at {url} not ready after {timeout}s")
+
+    def _load_tokenizer(self):
+        """Load tokenizer for input preparation."""
+        self._tokenizer = AutoTokenizer.from_pretrained(
+            self.search_config.prm_path, trust_remote_code=True
+        )
+        self.step_sep_id = self._tokenizer.encode("<extra_0>")[0]
+
+    def score(
+        self, questions: list[str], outputs: list[list[str]]
+    ) -> list[list[list[float]]]:
+        """Score using vLLM API server."""
+        formatted_texts, lengths = self._prepare_inputs_qwen(questions, outputs)
+
+        # Batch requests to API
+        flat_scores = []
+        batch_size = self.search_config.prm_batch_size
+
+        for i in range(0, len(formatted_texts), batch_size):
+            batch = formatted_texts[i : i + batch_size]
+            batch_scores = self._score_batch(batch)
+            flat_scores.extend(batch_scores)
+
+        return self._reshape_scores(flat_scores, lengths)
+
+    def _score_batch(self, texts: list[str]) -> list[list[float]]:
+        """Send batch to API and extract step scores."""
+        # Use round-robin client selection for load balancing
+        client = self.clients[hash(texts[0]) % len(self.clients)]
+
+        request_data = {
+            "model": self.search_config.prm_path,
+            "input": texts,
+        }
+
+        for attempt in range(self.search_config.prm_api_max_retries):
+            try:
+                response = client.post(
+                    "/score",
+                    json=request_data,
+                )
+                response.raise_for_status()
+                result = response.json()
+
+                return self._parse_api_response(result, texts)
+
+            except httpx.RequestError as e:
+                logger.warning(f"API request failed (attempt {attempt + 1}): {e}")
+                if attempt == self.search_config.prm_api_max_retries - 1:
+                    raise
+                time.sleep(2**attempt)  # Exponential backoff
+
+        return [[0.0] for _ in texts]
+
+    def _parse_api_response(
+        self, result: dict, texts: list[str]
+    ) -> list[list[float]]:
+        """Parse API response to extract step-level scores."""
+        step_scores = []
+
+        for i, text in enumerate(texts):
+            input_ids = self._tokenizer.encode(text)
+            step_positions = [
+                j for j, tid in enumerate(input_ids) if tid == self.step_sep_id
+            ]
+
+            # Extract scores from API response
+            if "data" in result and i < len(result["data"]):
+                scores_data = result["data"][i]
+                if isinstance(scores_data, dict):
+                    if "scores" in scores_data:
+                        # Token-level scores
+                        all_scores = scores_data["scores"]
+                        step_scores.append(
+                            [
+                                all_scores[pos] if pos < len(all_scores) else 0.0
+                                for pos in step_positions
+                            ]
+                        )
+                    elif "score" in scores_data:
+                        # Sequence-level score - replicate for all steps
+                        seq_score = scores_data["score"]
+                        step_scores.append([seq_score] * len(step_positions))
+                    else:
+                        step_scores.append([0.0] * len(step_positions))
+                elif isinstance(scores_data, (list, tuple)):
+                    # Direct token scores
+                    step_scores.append(
+                        [
+                            scores_data[pos] if pos < len(scores_data) else 0.0
+                            for pos in step_positions
+                        ]
+                    )
+                else:
+                    step_scores.append([float(scores_data)] * len(step_positions))
+            else:
+                step_scores.append([0.0] * len(step_positions))
+
+        return step_scores
+
+    def close(self):
+        """Close HTTP clients."""
+        for client in self.clients:
+            client.close()
+
+
+def load_prm(config: Config) -> PRM | VLLMRewardBase:
+    """
+    Load PRM based on configuration.
+    Supports three backends: transformers, vllm_offline, vllm_api
+    """
+    # Route based on backend selection
+    if config.prm_backend == "vllm_offline":
+        logger.info(f"Loading PRM with vLLM offline backend: {config.prm_path}")
+        return VLLMRewardOffline(config)
+
+    if config.prm_backend == "vllm_api":
+        logger.info(f"Loading PRM with vLLM API backend: {config.prm_path}")
+        return VLLMRewardAPI(config)
+
+    # Default: Transformers-based implementation (backward compatible)
+    logger.info(f"Loading PRM with transformers backend: {config.prm_path}")
+
     if config.prm_path == "peiyi9979/math-shepherd-mistral-7b-prm":
         return MathShepherd(config)
 

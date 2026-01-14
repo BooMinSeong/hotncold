@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal
 
 from huggingface_hub import get_full_repo_name
@@ -29,6 +29,20 @@ class Config:
         0.5  # vllm is allocated 0.5 of GPU memory, the PRM uses the rest
     )
     prm_path: str = "Skywork/Skywork-o1-Open-PRM-Qwen-2.5-1.5B"
+
+    # PRM Backend Selection
+    prm_backend: Literal["transformers", "vllm_offline", "vllm_api"] = "transformers"
+
+    # vLLM Offline Mode Settings (for dual GPU setup)
+    prm_gpu_memory_utilization: float = 0.4
+    prm_tensor_parallel_size: int = 1
+
+    # vLLM API Mode Settings (for separate PRM server)
+    prm_api_base_url: str | None = None
+    prm_api_base_urls: list[str] | None = None
+    prm_service_file: str | None = None
+    prm_api_timeout: float = 300.0
+    prm_api_max_retries: int = 3
     # Output Related Options
     output_dir: str = None
     num_proc: int = None
@@ -72,6 +86,23 @@ class Config:
 
     def __post_init__(self):
         import math
+
+        # PRM backend validation
+        if self.prm_backend == "vllm_api":
+            if self.prm_api_base_url is None and self.prm_api_base_urls is None and self.prm_service_file is None:
+                raise ValueError(
+                    "Either prm_api_base_url, prm_api_base_urls, or prm_service_file must be set "
+                    "when using vllm_api backend"
+                )
+
+        if self.prm_backend == "vllm_offline":
+            total_gpu = self.gpu_memory_utilization + self.prm_gpu_memory_utilization
+            if total_gpu > 0.95:
+                raise ValueError(
+                    f"Total GPU memory utilization ({total_gpu}) exceeds safe limit (0.95). "
+                    f"Reduce gpu_memory_utilization ({self.gpu_memory_utilization}) or "
+                    f"prm_gpu_memory_utilization ({self.prm_gpu_memory_utilization})."
+                )
 
         # Temperature validation
         if self.temperatures is not None:

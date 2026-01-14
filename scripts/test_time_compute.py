@@ -45,30 +45,46 @@ def main():
     approach_fn = APPROACHES[config.approach]
 
     num_gpus = torch.cuda.device_count()
+
+    # Determine tensor parallel size based on PRM backend
+    if config.prm_backend == "vllm_offline" and num_gpus > 1:
+        # Reserve some GPUs for PRM in offline mode
+        llm_tensor_parallel = max(1, num_gpus - config.prm_tensor_parallel_size)
+        logger.info(
+            f"vLLM offline mode: LLM using {llm_tensor_parallel} GPUs, "
+            f"PRM using {config.prm_tensor_parallel_size} GPUs"
+        )
+    else:
+        llm_tensor_parallel = num_gpus
+
     llm = LLM(
         model=config.model_path,
         gpu_memory_utilization=config.gpu_memory_utilization,
         enable_prefix_caching=True,
         seed=config.seed,
-        tensor_parallel_size=num_gpus,
+        tensor_parallel_size=llm_tensor_parallel,
     )
     prm = load_prm(config)
 
-    dataset = get_dataset(config)
-    dataset = dataset.map(
-        approach_fn,
-        batched=True,
-        batch_size=config.search_batch_size,
-        fn_kwargs={"config": config, "llm": llm, "prm": prm},
-        desc="Running search",
-        load_from_cache_file=False,
-    )
+    try:
+        dataset = get_dataset(config)
+        dataset = dataset.map(
+            approach_fn,
+            batched=True,
+            batch_size=config.search_batch_size,
+            fn_kwargs={"config": config, "llm": llm, "prm": prm},
+            desc="Running search",
+            load_from_cache_file=False,
+        )
 
-    dataset = score(dataset, config)
-    dataset = score_pass_at_k(dataset, config)
+        dataset = score(dataset, config)
+        dataset = score_pass_at_k(dataset, config)
 
-    save_dataset(dataset, config)
-    logger.info("Done 🔥!")
+        save_dataset(dataset, config)
+        logger.info("Done!")
+    finally:
+        # Clean up PRM resources
+        prm.close()
 
 
 if __name__ == "__main__":
