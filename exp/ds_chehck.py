@@ -59,9 +59,9 @@ def format_missing_ranges(missing):
     return ",".join(f"[{s},{e})" for s, e in missing)
 
 
-def print_oneline(dataset_name, filter_str, coverage_pct, missing, status="OK"):
+def print_oneline(dataset_name, filters, coverage_pct, missing, status="OK"):
     """Print single line status output"""
-    filter_display = filter_str if filter_str else "all"
+    filter_display = ",".join(filters) if filters else "all"
 
     if status == "NOT_FOUND":
         print(f"{dataset_name} | {filter_display} | - | NOT_FOUND")
@@ -81,8 +81,11 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # List branches with filter
+  # List branches with single filter
   python ds_chehck.py ENSEONG/hnc-Qwen2.5-1.5B-Instruct-bon --filter seed-42
+
+  # List branches with multiple filters (AND condition)
+  python ds_chehck.py ENSEONG/hnc-Qwen2.5-1.5B-Instruct-bon --filter seed-42 --filter T-0.8
 
   # List all branches
   python ds_chehck.py ENSEONG/hnc-Qwen2.5-1.5B-Instruct-bon
@@ -90,8 +93,8 @@ Examples:
     )
     parser.add_argument('dataset_name', type=str,
                        help='HuggingFace dataset name (e.g., org/dataset-name)')
-    parser.add_argument('--filter', type=str, default=None,
-                       help='Filter string for branch names (optional)')
+    parser.add_argument('--filter', type=str, action='append', default=None,
+                       help='Filter string for branch names (can be used multiple times for AND condition)')
     parser.add_argument('--total', type=int, default=500,
                        help='Total range to check for gaps (default: 500)')
     parser.add_argument('--format', type=str, choices=['human', 'oneline'],
@@ -115,8 +118,11 @@ Examples:
 
     # 필터링 및 출력
     if args.filter:
-        # 필터링된 브랜치 찾기
-        filtered_branches = [name for name in branch_names if args.filter in name]
+        # 필터링된 브랜치 찾기 (모든 필터 조건을 AND로 적용)
+        filtered_branches = [
+            name for name in branch_names
+            if all(f in name for f in args.filter)
+        ]
 
         # chunk 범위 파싱
         chunk_ranges = []
@@ -138,8 +144,9 @@ Examples:
                 print_oneline(args.dataset_name, args.filter, coverage_pct, missing)
         else:
             # Human-readable format
+            filter_display = ", ".join(args.filter)
             print("=" * 70)
-            print(f"Filtered branches (matching '{args.filter}'):")
+            print(f"Filtered branches (matching '{filter_display}'):")
             print("=" * 70)
             for name in filtered_branches:
                 print(name)
