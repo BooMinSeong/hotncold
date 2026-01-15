@@ -68,16 +68,77 @@ is_correct = evaluate_answer(completion, gold_answer)
 
 ## CLI 사용법
 
-```bash
-# 기본 분석
-python exp/scripts/analyze_results.py \
-    --filter-model="Qwen2.5-1.5B-Instruct" \
-    --filter-strategy="hnc"
+### 분석 타입
 
-# 모델 비교 분석
+| 타입 | 설명 | 대상 데이터셋 |
+|------|------|--------------|
+| `hnc_comparison` | HNC vs Default (T=0.8, T=0.4) 비교 | MATH-500 |
+| `temperature_comparison` | T=0.4 vs T=0.8 비교 | AIME25 |
+| `model_comparison` | 모델 크기 비교 (1.5B vs 3B) | AIME25 |
+| `scaling` | 스케일링 곡선 생성 | 모두 |
+| `default` | 기본 정확도 분석 | 모두 |
+
+### MATH-500 HNC vs Default 비교
+
+```bash
+python exp/scripts/analyze_results.py \
+    --filter-dataset="MATH-500" \
+    --analysis-type="hnc_comparison" \
+    --output-dir="exp/math500_analysis"
+```
+
+출력 파일:
+- `{approach}-scaling_curves.png` - 전략별 스케일링 곡선
+- `{approach}-{method}-hnc_vs_default.png` - HNC vs Default 비교
+- `{approach}-pass_at_k_curves.png` - pass@k 곡선
+- `{approach}-pass_at_k_comparison.png` - pass@k 바 차트
+- `analysis_report.md` - 마크다운 리포트
+
+### AIME25 온도 비교 (T=0.4 vs T=0.8)
+
+```bash
 python exp/scripts/analyze_results.py \
     --filter-dataset="aime25" \
-    --analysis-type="model_comparison"
+    --filter-model="Qwen2.5-1.5B-Instruct" \
+    --analysis-type="temperature_comparison" \
+    --output-dir="exp/aime25_temp_analysis"
+```
+
+출력 파일:
+- `aime25-{model}-{approach}-scaling_curves.png` - 온도별 스케일링 곡선
+- `aime25-{model}-{approach}-{method}-temp_comparison.png` - 온도 비교
+- `aime25-{model}-{approach}-pass_at_k_curves.png` - pass@k 곡선
+- `analysis_report.md` - 마크다운 리포트
+
+### AIME25 모델 크기 비교 (1.5B vs 3B)
+
+```bash
+python exp/scripts/analyze_results.py \
+    --filter-dataset="aime25" \
+    --analysis-type="model_comparison" \
+    --output-dir="exp/aime25_model_analysis"
+```
+
+출력 파일:
+- `aime25-{approach}-T{temp}-model_scaling.png` - 모델별 스케일링 곡선
+- `aime25-{approach}-{method}-T{temp}-model_comparison.png` - 모델 비교
+- `aime25-{approach}-T{temp}-model_pass_at_k.png` - 모델별 pass@k
+- `analysis_report.md` - 마크다운 리포트
+
+### 기본 옵션
+
+```bash
+# 플롯 없이 리포트만 생성
+python exp/scripts/analyze_results.py \
+    --filter-dataset="MATH-500" \
+    --analysis-type="hnc_comparison" \
+    --no-plots
+
+# 상세 출력
+python exp/scripts/analyze_results.py \
+    --filter-dataset="aime25" \
+    --analysis-type="model_comparison" \
+    --verbose
 
 # 도움말
 python exp/scripts/analyze_results.py --help
@@ -108,3 +169,27 @@ results:
 | `analysis.metrics` | `analyze_single_dataset()`, `analyze_pass_at_k()` |
 | `analysis.difficulty` | `compute_problem_baselines()`, `stratify_by_difficulty()` |
 | `analysis.visualization` | `plot_comparison()`, `plot_bar_comparison()` |
+
+## 그래프 타입
+
+### 스케일링 곡선 (Scaling Curves)
+- X축: Number of Samples (n), 로그 스케일
+- Y축: Accuracy
+- 선: 전략/온도/모델별로 구분
+- 오차대역: ± 1 std (seeds 평균)
+
+### HNC/온도/모델 비교
+- X축: Number of Samples (n)
+- Y축: Accuracy
+- 실선+마커: 주요 비교 대상 (HNC, T=0.4, 더 큰 모델)
+- 점선: 베이스라인 (Default, T=0.8, 더 작은 모델)
+
+### Pass@k 곡선
+- X축: k (number of samples), 로그 스케일
+- Y축: Pass@k probability
+- 상한선을 나타내는 이론적 성능 지표
+
+### Pass@k 바 차트
+- X축: 선택된 k 값 [1, 8, 32, 64]
+- Y축: Pass@k probability
+- 그룹: 전략/온도/모델별로 비교
