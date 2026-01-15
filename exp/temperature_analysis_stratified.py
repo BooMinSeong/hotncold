@@ -38,30 +38,17 @@ from temperature_utils import (
     validate_temperature_config,
 )
 
+# Import from new analysis module
+from analysis.core import evaluate_answer
+from analysis.difficulty import (
+    ProblemBaseline,
+    DifficultyLevel,
+)
+
 
 # ======================================================================================
 # DATA STRUCTURES
 # ======================================================================================
-
-@dataclass
-class ProblemBaseline:
-    """Baseline statistics for a single problem."""
-    unique_id: str
-    problem_text: str
-    answer: str
-    mean_accuracy: float  # Mean across all completions, seeds, approaches
-    num_evaluations: int  # Total completions evaluated
-
-
-@dataclass
-class DifficultyLevel:
-    """Difficulty level definition."""
-    level: int  # 1-5 (1=easiest, 5=hardest)
-    min_accuracy: float
-    max_accuracy: float
-    problem_count: int
-    problem_ids: list[str]
-
 
 @dataclass
 class TemperatureResult:
@@ -70,42 +57,6 @@ class TemperatureResult:
     overall_accuracy: float
     accuracy_by_difficulty: dict[int, float]  # level -> accuracy
     sample_count_by_difficulty: dict[int, int]  # level -> count
-
-
-# ======================================================================================
-# HELPER FUNCTIONS
-# ======================================================================================
-
-def evaluate_answer(completion: str, gold_answer: str) -> bool:
-    """
-    Evaluate if a completion contains the correct answer.
-
-    Args:
-        completion: Generated completion text
-        gold_answer: Gold standard answer
-
-    Returns:
-        True if correct, False otherwise
-    """
-    try:
-        # Parse gold answer
-        gold = parse("\\boxed{" + gold_answer + "}")
-
-        # Parse prediction from completion
-        # Extract content in \\boxed{...}
-        boxed_pattern = r'\\boxed\{([^}]+)\}'
-        match = re.search(boxed_pattern, completion)
-        if match:
-            pred_text = match.group(1)
-        else:
-            # Fallback: try to extract last number-like string
-            pred_text = completion.strip().split()[-1] if completion.strip() else ""
-
-        pred = parse("\\boxed{" + pred_text + "}")
-
-        return verify(gold, pred)
-    except:
-        return False
 
 
 # ======================================================================================

@@ -1,0 +1,234 @@
+# Experiment Results Registry
+# This file contains all experiment results available on Hugging Face Hub
+# Each entry represents a unique experiment configuration
+
+results:
+  # =============================================================================
+  # MATH-500 Dataset - HNC Strategy (Dynamic Temperature)
+  # =============================================================================
+  - name: "hnc-math500-1.5B-bon"
+    hub_path: "ENSEONG/hnc-Qwen2.5-1.5B-Instruct-bon"
+    model: "Qwen2.5-1.5B-Instruct"
+    dataset: "MATH-500"
+    approach: "bon"
+    strategy: "hnc"
+    seeds: [128, 192, 256]
+    temperatures: [0.4, 0.8, 1.2, 1.6]
+
+  - name: "hnc-math500-1.5B-beam_search"
+    hub_path: "ENSEONG/hnc-Qwen2.5-1.5B-Instruct-beam_search"
+    model: "Qwen2.5-1.5B-Instruct"
+    dataset: "MATH-500"
+    approach: "beam_search"
+    strategy: "hnc"
+    seeds: [128, 192, 256]
+    temperatures: [0.4, 0.8, 1.2, 1.6]
+
+  - name: "hnc-math500-1.5B-dvts"
+    hub_path: "ENSEONG/hnc-Qwen2.5-1.5B-Instruct-dvts"
+    model: "Qwen2.5-1.5B-Instruct"
+    dataset: "MATH-500"
+    approach: "dvts"
+    strategy: "hnc"
+    seeds: [128, 192, 256]
+    temperatures: [0.4, 0.8, 1.2, 1.6]
+
+  # =============================================================================
+  # MATH-500 Dataset - Default Strategy (Fixed Temperature)
+  # =============================================================================
+  - name: "default-math500-1.5B-T0.8-bon"
+    hub_path: "ENSEONG/default-Qwen2.5-1.5B-Instruct-bon"
+    model: "Qwen2.5-1.5B-Instruct"
+    dataset: "MATH-500"
+    approach: "bon"
+    strategy: "default"
+    seeds: [0, 42, 64]
+    temperatures: [0.8]
+    subset_template: "HuggingFaceH4_MATH-500--T-0.8--top_p-1.0--n-64--seed-{seed}--agg_strategy-last"
+
+  - name: "default-math500-1.5B-T0.8-beam_search"
+    hub_path: "ENSEONG/default-Qwen2.5-1.5B-Instruct-beam_search"
+    model: "Qwen2.5-1.5B-Instruct"
+    dataset: "MATH-500"
+    approach: "beam_search"
+    strategy: "default"
+    seeds: [0, 42, 64]
+    temperatures: [0.8]
+    subset_template: "HuggingFaceH4_MATH-500--T-0.8--top_p-1.0--n-64--m-4--iters-40--look-0--seed-{seed}--agg_strategy--last"
+
+  - name: "default-math500-1.5B-T0.8-dvts"
+    hub_path: "ENSEONG/default-Qwen2.5-1.5B-Instruct-dvts"
+    model: "Qwen2.5-1.5B-Instruct"
+    dataset: "MATH-500"
+    approach: "dvts"
+    strategy: "default"
+    seeds: [0, 42, 64]
+    temperatures: [0.8]
+    subset_template: "HuggingFaceH4_MATH-500--T-0.8--top_p-1.0--n-64--m-4--iters-40--look-0--seed-{seed}--agg_strategy--last"
+
+  - name: "default-math500-1.5B-T0.4-bon"
+    hub_path: "ENSEONG/default-Qwen2.5-1.5B-Instruct-bon"
+    model: "Qwen2.5-1.5B-Instruct"
+    dataset: "MATH-500"
+    approach: "bon"
+    strategy: "default"
+    seeds: [0, 42, 64]
+    temperatures: [0.4]
+    subset_template: "HuggingFaceH4_MATH-500--T-0.4--top_p-1.0--n-64--seed-{seed}--agg_strategy-last"
+
+  - name: "default-math500-1.5B-T0.4-beam_search"
+    hub_path: "ENSEONG/default-Qwen2.5-1.5B-Instruct-beam_search"
+    model: "Qwen2.5-1.5B-Instruct"
+    dataset: "MATH-500"
+    approach: "beam_search"
+    strategy: "default"
+    seeds: [0, 42, 64]
+    temperatures: [0.4]
+    subset_template: "HuggingFaceH4_MATH-500--T-0.4--top_p-1.0--n-64--m-4--iters-40--look-0--seed-{seed}--agg_strategy--last"
+
+  - name: "default-math500-1.5B-T0.4-dvts"
+    hub_path: "ENSEONG/default-Qwen2.5-1.5B-Instruct-dvts"
+    model: "Qwen2.5-1.5B-Instruct"
+    dataset: "MATH-500"
+    approach: "dvts"
+    strategy: "default"
+    seeds: [0, 42, 64]
+    temperatures: [0.4]
+    subset_template: "HuggingFaceH4_MATH-500--T-0.4--top_p-1.0--n-64--m-4--iters-40--look-0--seed-{seed}--agg_strategy--last"
+
+  # =============================================================================
+  # AIME25 Dataset - Qwen2.5-1.5B-Instruct
+  # =============================================================================
+  - name: "default-aime25-1.5B-T0.4-bon"
+    hub_path: "ENSEONG/default-aime25-Qwen2.5-1.5B-Instruct-bon"
+    model: "Qwen2.5-1.5B-Instruct"
+    dataset: "aime25"
+    approach: "bon"
+    strategy: "default"
+    seeds: [0, 42, 64]
+    temperatures: [0.4]
+    subset_template: "math-ai_aime25--T-0.4--top_p-1.0--n-64--seed-{seed}--agg_strategy-last"
+
+  - name: "default-aime25-1.5B-T0.4-beam_search"
+    hub_path: "ENSEONG/default-aime25-Qwen2.5-1.5B-Instruct-beam_search"
+    model: "Qwen2.5-1.5B-Instruct"
+    dataset: "aime25"
+    approach: "beam_search"
+    strategy: "default"
+    seeds: [0, 42, 64]
+    temperatures: [0.4]
+    subset_template: "math-ai_aime25--T-0.4--top_p-1.0--n-64--m-4--iters-40--look-0--seed-{seed}--agg_strategy--last"
+
+  - name: "default-aime25-1.5B-T0.4-dvts"
+    hub_path: "ENSEONG/default-aime25-Qwen2.5-1.5B-Instruct-dvts"
+    model: "Qwen2.5-1.5B-Instruct"
+    dataset: "aime25"
+    approach: "dvts"
+    strategy: "default"
+    seeds: [0, 42, 64]
+    temperatures: [0.4]
+    subset_template: "math-ai_aime25--T-0.4--top_p-1.0--n-64--m-4--iters-40--look-0--seed-{seed}--agg_strategy--last"
+
+  - name: "default-aime25-1.5B-T0.8-bon"
+    hub_path: "ENSEONG/default-aime25-Qwen2.5-1.5B-Instruct-bon"
+    model: "Qwen2.5-1.5B-Instruct"
+    dataset: "aime25"
+    approach: "bon"
+    strategy: "default"
+    seeds: [0, 42, 64]
+    temperatures: [0.8]
+    subset_template: "math-ai_aime25--T-0.8--top_p-1.0--n-64--seed-{seed}--agg_strategy-last"
+
+  - name: "default-aime25-1.5B-T0.8-beam_search"
+    hub_path: "ENSEONG/default-aime25-Qwen2.5-1.5B-Instruct-beam_search"
+    model: "Qwen2.5-1.5B-Instruct"
+    dataset: "aime25"
+    approach: "beam_search"
+    strategy: "default"
+    seeds: [0, 42, 64]
+    temperatures: [0.8]
+    subset_template: "math-ai_aime25--T-0.8--top_p-1.0--n-64--m-4--iters-40--look-0--seed-{seed}--agg_strategy--last"
+
+  - name: "default-aime25-1.5B-T0.8-dvts"
+    hub_path: "ENSEONG/default-aime25-Qwen2.5-1.5B-Instruct-dvts"
+    model: "Qwen2.5-1.5B-Instruct"
+    dataset: "aime25"
+    approach: "dvts"
+    strategy: "default"
+    seeds: [0, 42, 64]
+    temperatures: [0.8]
+    subset_template: "math-ai_aime25--T-0.8--top_p-1.0--n-64--m-4--iters-40--look-0--seed-{seed}--agg_strategy--last"
+
+  # =============================================================================
+  # AIME25 Dataset - Qwen2.5-3B-Instruct
+  # =============================================================================
+  - name: "default-aime25-3B-T0.4-bon"
+    hub_path: "ENSEONG/default-aime25-Qwen2.5-3B-Instruct-bon"
+    model: "Qwen2.5-3B-Instruct"
+    dataset: "aime25"
+    approach: "bon"
+    strategy: "default"
+    seeds: [0, 42, 64]
+    temperatures: [0.4]
+    subset_template: "math-ai_aime25--T-0.4--top_p-1.0--n-64--seed-{seed}--agg_strategy-last"
+
+  - name: "default-aime25-3B-T0.4-beam_search"
+    hub_path: "ENSEONG/default-aime25-Qwen2.5-3B-Instruct-beam_search"
+    model: "Qwen2.5-3B-Instruct"
+    dataset: "aime25"
+    approach: "beam_search"
+    strategy: "default"
+    seeds: [0, 42, 64]
+    temperatures: [0.4]
+    subset_template: "math-ai_aime25--T-0.4--top_p-1.0--n-64--m-4--iters-40--look-0--seed-{seed}--agg_strategy--last"
+
+  - name: "default-aime25-3B-T0.4-dvts"
+    hub_path: "ENSEONG/default-aime25-Qwen2.5-3B-Instruct-dvts"
+    model: "Qwen2.5-3B-Instruct"
+    dataset: "aime25"
+    approach: "dvts"
+    strategy: "default"
+    seeds: [0, 42, 64]
+    temperatures: [0.4]
+    subset_template: "math-ai_aime25--T-0.4--top_p-1.0--n-64--m-4--iters-40--look-0--seed-{seed}--agg_strategy--last"
+
+  - name: "default-aime25-3B-T0.8-bon"
+    hub_path: "ENSEONG/default-aime25-Qwen2.5-3B-Instruct-bon"
+    model: "Qwen2.5-3B-Instruct"
+    dataset: "aime25"
+    approach: "bon"
+    strategy: "default"
+    seeds: [0, 42, 64]
+    temperatures: [0.8]
+    subset_template: "math-ai_aime25--T-0.8--top_p-1.0--n-64--seed-{seed}--agg_strategy-last"
+
+  - name: "default-aime25-3B-T0.8-beam_search"
+    hub_path: "ENSEONG/default-aime25-Qwen2.5-3B-Instruct-beam_search"
+    model: "Qwen2.5-3B-Instruct"
+    dataset: "aime25"
+    approach: "beam_search"
+    strategy: "default"
+    seeds: [0, 42, 64]
+    temperatures: [0.8]
+    subset_template: "math-ai_aime25--T-0.8--top_p-1.0--n-64--m-4--iters-40--look-0--seed-{seed}--agg_strategy--last"
+
+  - name: "default-aime25-3B-T0.8-dvts"
+    hub_path: "ENSEONG/default-aime25-Qwen2.5-3B-Instruct-dvts"
+    model: "Qwen2.5-3B-Instruct"
+    dataset: "aime25"
+    approach: "dvts"
+    strategy: "default"
+    seeds: [0, 42, 64]
+    temperatures: [0.8]
+    subset_template: "math-ai_aime25--T-0.8--top_p-1.0--n-64--m-4--iters-40--look-0--seed-{seed}--agg_strategy--last"
+
+# Default parameters for experiments
+defaults:
+  n: 64
+  beam_width: 16
+
+# Output configuration
+output:
+  format: "human"
+  generate_plots: true
+  generate_report: true

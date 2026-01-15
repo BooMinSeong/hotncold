@@ -17,16 +17,8 @@ import seaborn as sns
 import os
 from datetime import datetime
 
-
-def evaluate_result(data, key="answer"):
-    """Evaluate a single prediction against gold answer."""
-    gold_answer = data["answer"]
-    gold_answer = parse("\\boxed{" + gold_answer + "}")
-
-    prediction = data[key]
-    prediction = parse(prediction)
-
-    return verify(gold_answer, prediction)
+# Import from new analysis module
+from analysis.core import evaluate_result
 
 
 def score_pass_at_k(dataset: Dataset, n: int = 256) -> Dataset:
