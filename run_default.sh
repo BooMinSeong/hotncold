@@ -3,9 +3,9 @@
 SEEDS=(0 42 64)
 SEARCH_METHODS=("best_of_n.yaml" "beam_search.yaml" "dvts.yaml")
 METHOD_NAMES=("bon" "beam_search" "dvts")
-TEMPERATURE=0.4
+TEMPERATURE=0.2
 DATASET_NAME="HuggingFaceH4/MATH-500" # math-ai/aime25 "HuggingFaceH4/MATH-500"
-MODEL_NAME="Qwen2.5-3B-Instruct"
+MODEL_NAME="Qwen2.5-1.5B-Instruct"
 
 # 각 search method와 dataset name을 순회
 for i in "${!SEARCH_METHODS[@]}"; do

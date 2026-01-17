@@ -2,9 +2,9 @@
 
 SEEDS=(0 42 64)
 METHOD_NAMES=("bon" "beam_search" "dvts")
-TEMPERATURE=0.4
-DATASET_NAME="math-ai/aime25" # "HuggingFaceH4/MATH-500"
-MODEL_NAME="Qwen2.5-3B-Instruct"
+TEMPERATURE=0.1
+DATASET_NAME="math-ai/aime25" # "math-ai/aime25" # "HuggingFaceH4/MATH-500"
+MODEL_NAME="Qwen2.5-1.5B-Instruct"
 
 # Default parameters from config
 TOP_P=1.0
