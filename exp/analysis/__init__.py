@@ -1,26 +1,62 @@
 """Analysis module for experiment result processing.
 
 This module provides utilities for:
-- Core evaluation functions (evaluate_answer, evaluate_result)
-- Dataset loading (load_datasets_by_seed, load_from_registry)
-- Metrics calculation (analyze_single_dataset, analyze_pass_at_k)
-- Difficulty stratification (compute_problem_baselines, stratify_by_difficulty)
-- Visualization (plotting functions)
+- Auto-discovery of experiment configurations from Hub
+- Subset name parsing
+- Dataset loading
+- Core evaluation functions
+- Metrics calculation
+- Difficulty stratification
+- Visualization
+
+Example usage (new auto-discovery way):
+    from exp.analysis import discover_experiment, load_experiment_data
+
+    config = discover_experiment("ENSEONG/hnc-Qwen2.5-1.5B-Instruct-bon")
+    print(f"Auto-discovered seeds: {config.seeds}")
+    print(f"Auto-discovered temperatures: {config.temperatures}")
+
+    datasets = load_experiment_data(config)
+    for seed, dataset in datasets.items():
+        print(f"Seed {seed}: {len(dataset['train'])} samples")
 """
 
+# Auto-discovery (new API)
+from .discovery import (
+    DiscoveredRegistry,
+    ExperimentConfig,
+    create_registry_from_hub_paths,
+    discover_experiment,
+)
+
+# Parser
+from .parser import (
+    SubsetInfo,
+    infer_approach_from_hub_path,
+    infer_model_from_hub_path,
+    infer_strategy_from_hub_path,
+    parse_subset_name,
+)
+
+# Dataset loading
+from .datasets import (
+    get_available_configs,
+    load_all_experiment_data,
+    load_experiment_data,
+    load_experiment_data_by_temperature,
+    load_from_hub_path,
+    load_multiple_experiments,
+    summarize_experiment,
+)
+
+# Core evaluation
 from .core import (
     evaluate_answer,
     evaluate_result,
     extract_boxed_answer,
 )
 
-from .datasets import (
-    get_available_subsets,
-    load_datasets_by_seed,
-    load_from_registry,
-    load_multi_approach_datasets,
-)
-
+# Metrics
 from .metrics import (
     aggregate_across_seeds,
     analyze_pass_at_k,
@@ -29,6 +65,7 @@ from .metrics import (
     compute_pass_at_k_aggregated,
 )
 
+# Difficulty analysis
 from .difficulty import (
     DifficultyLevel,
     ProblemBaseline,
@@ -38,6 +75,7 @@ from .difficulty import (
     stratify_by_difficulty,
 )
 
+# Visualization
 from .visualization import (
     APPROACH_COLORS,
     METHOD_COLORS,
@@ -52,15 +90,29 @@ from .visualization import (
 )
 
 __all__ = [
+    # Auto-discovery (new)
+    "discover_experiment",
+    "ExperimentConfig",
+    "DiscoveredRegistry",
+    "create_registry_from_hub_paths",
+    # Parser (new)
+    "parse_subset_name",
+    "SubsetInfo",
+    "infer_approach_from_hub_path",
+    "infer_model_from_hub_path",
+    "infer_strategy_from_hub_path",
+    # Dataset loading (new)
+    "load_experiment_data",
+    "load_experiment_data_by_temperature",
+    "load_all_experiment_data",
+    "load_from_hub_path",
+    "load_multiple_experiments",
+    "get_available_configs",
+    "summarize_experiment",
     # Core
     "evaluate_answer",
     "evaluate_result",
     "extract_boxed_answer",
-    # Datasets
-    "load_datasets_by_seed",
-    "load_multi_approach_datasets",
-    "load_from_registry",
-    "get_available_subsets",
     # Metrics
     "analyze_single_dataset",
     "analyze_pass_at_k",

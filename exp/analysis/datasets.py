@@ -1,216 +1,269 @@
-"""Dataset loading utilities for experiment analysis.
+"""Dataset loading utilities for experiment analysis (Auto-Discovery Version).
 
 This module provides functions to load datasets from Hugging Face Hub,
-with support for registry-based configuration and seed/temperature filtering.
+using the auto-discovery system for configuration.
 
-Extracted from:
-- exp/temperature_analysis_per_problem.py (load_default_datasets, load_hnc_datasets)
-- exp/temperature_analysis_stratified.py (load_default_datasets, load_hnc_datasets)
+The key principle: Hub data is the Single Source of Truth.
+Instead of manually specifying seeds/temperatures, we discover them automatically.
+
+Example usage:
+    from exp.analysis.discovery import discover_experiment
+    from exp.analysis.datasets import load_experiment_data
+
+    # Discover configuration from Hub
+    config = discover_experiment("ENSEONG/hnc-Qwen2.5-1.5B-Instruct-bon")
+    print(f"Seeds: {config.seeds}")  # Auto-discovered!
+
+    # Load datasets for all discovered seeds
+    datasets = load_experiment_data(config)
+    for seed, dataset in datasets.items():
+        print(f"Seed {seed}: {len(dataset['train'])} samples")
 """
 
-from collections import defaultdict
 from typing import Any, Optional
 
-from datasets import get_dataset_config_names, load_dataset
+from datasets import load_dataset
 
-import sys
-from pathlib import Path
-
-# Add parent directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent))
-from configs import ResultEntry
+from .discovery import ExperimentConfig, discover_experiment
 
 
-def load_datasets_by_seed(
-    dataset_path: str,
-    seeds: list[int],
-    subset_template: Optional[str] = None,
-    filter_strings: Optional[list[str]] = None,
-    temperature: Optional[float] = None,
+def load_experiment_data(
+    config: ExperimentConfig,
+    seeds: Optional[list[int]] = None,
+    temperature: Optional[float | tuple] = None,
     verbose: bool = True,
 ) -> dict[int, Any]:
-    """Load datasets for multiple seeds.
-
-    This unified function handles both template-based and filter-based
-    subset discovery.
+    """Load datasets for an experiment configuration.
 
     Args:
-        dataset_path: Hugging Face Hub dataset path
-        seeds: List of seed values to load
-        subset_template: Template string with {seed} and optional {temperature} placeholders
-        filter_strings: List of strings that must all appear in subset name
-        temperature: Temperature value for template substitution
-        verbose: Whether to print progress messages
+        config: ExperimentConfig from discover_experiment()
+        seeds: Specific seeds to load (default: all discovered seeds)
+        temperature: Specific temperature to filter by
+        verbose: Print progress messages
 
     Returns:
         Dictionary mapping seed -> Dataset
-
-    Examples:
-        >>> # Template-based loading
-        >>> datasets = load_datasets_by_seed(
-        ...     "ENSEONG/default-Qwen2.5-1.5B-Instruct-bon",
-        ...     seeds=[0, 42, 64],
-        ...     subset_template="HuggingFaceH4_MATH-500--T-{temperature}--...-seed-{seed}--...",
-        ...     temperature=0.4
-        ... )
-
-        >>> # Filter-based loading
-        >>> datasets = load_datasets_by_seed(
-        ...     "ENSEONG/hnc-Qwen2.5-1.5B-Instruct-bon",
-        ...     seeds=[128, 192, 256],
-        ...     filter_strings=["T-0.8"]
-        ... )
     """
+    seeds = seeds or config.seeds
     datasets = {}
 
     for seed in seeds:
+        subset_name = config.get_subset_name(seed, temperature)
+        if not subset_name:
+            if verbose:
+                temp_str = f", temp {temperature}" if temperature else ""
+                print(f"  Warning: No subset found for seed {seed}{temp_str}")
+            continue
+
         try:
-            if subset_template:
-                # Template-based subset discovery
-                subset_name = subset_template.replace("{seed}", str(seed))
-                if temperature is not None:
-                    subset_name = subset_name.replace("{temperature}", str(temperature))
-                if verbose:
-                    print(f"  Seed {seed}: {subset_name}")
-                dataset = load_dataset(dataset_path, subset_name)
-            else:
-                # Filter-based subset discovery
-                configs = get_dataset_config_names(dataset_path)
-                matching = [c for c in configs if f"seed-{seed}" in c]
-
-                if filter_strings:
-                    for filter_str in filter_strings:
-                        matching = [c for c in matching if filter_str in c]
-
-                if not matching:
-                    if verbose:
-                        print(f"  Warning: No subset found for seed {seed}")
-                    continue
-
-                if verbose:
-                    print(f"  Seed {seed}: {matching[0]}")
-                dataset = load_dataset(dataset_path, matching[0])
-
+            if verbose:
+                short_name = subset_name[:60] + "..." if len(subset_name) > 60 else subset_name
+                print(f"  Loading seed {seed}: {short_name}")
+            dataset = load_dataset(config.hub_path, subset_name)
             datasets[seed] = dataset
-
         except Exception as e:
             if verbose:
                 print(f"  Error loading seed {seed}: {e}")
-            continue
 
     return datasets
 
 
-def load_multi_approach_datasets(
-    approaches: list[str],
-    seeds: list[int],
-    dataset_paths: dict[str, str],
-    subset_templates: Optional[dict[str, str]] = None,
-    filter_strings: Optional[list[str]] = None,
-    temperature: Optional[float] = None,
-    verbose: bool = True,
-) -> dict[str, dict[int, Any]]:
-    """Load datasets for multiple approaches and seeds.
-
-    Args:
-        approaches: List of approaches (e.g., ['bon', 'beam_search', 'dvts'])
-        seeds: List of seed values
-        dataset_paths: Dict mapping approach -> Hub path
-        subset_templates: Dict mapping approach -> subset template (optional)
-        filter_strings: List of filter strings for subset discovery
-        temperature: Temperature value for template substitution
-        verbose: Print progress messages
-
-    Returns:
-        Nested dict: {approach: {seed: Dataset}}
-    """
-    datasets = defaultdict(dict)
-
-    for approach in approaches:
-        if approach not in dataset_paths:
-            if verbose:
-                print(f"  Warning: No dataset path for approach {approach}")
-            continue
-
-        if verbose:
-            print(f"\n  Loading {approach} datasets...")
-
-        template = subset_templates.get(approach) if subset_templates else None
-
-        datasets[approach] = load_datasets_by_seed(
-            dataset_path=dataset_paths[approach],
-            seeds=seeds,
-            subset_template=template,
-            filter_strings=filter_strings,
-            temperature=temperature,
-            verbose=verbose,
-        )
-
-    return dict(datasets)
-
-
-def load_from_registry(
-    result: ResultEntry,
+def load_from_hub_path(
+    hub_path: str,
     seeds: Optional[list[int]] = None,
-    temperature: Optional[float] = None,
-    filter_strings: Optional[list[str]] = None,
+    temperature: Optional[float | tuple] = None,
     verbose: bool = True,
 ) -> dict[int, Any]:
-    """Load datasets using a registry entry.
+    """Load datasets directly from a hub path.
 
-    This function provides a convenient way to load datasets using
-    configuration from the registry.
+    Convenience function that combines discovery and loading.
 
     Args:
-        result: ResultEntry from registry
-        seeds: Override seeds (default: use result.seeds)
-        temperature: Temperature for template substitution
-        filter_strings: Additional filter strings
-        verbose: Print progress messages
+        hub_path: HuggingFace Hub dataset path
+        seeds: Specific seeds to load (default: all discovered)
+        temperature: Temperature filter
+        verbose: Print progress
 
     Returns:
         Dictionary mapping seed -> Dataset
     """
-    seeds = seeds or result.seeds
-    if not seeds:
-        raise ValueError(f"No seeds specified for {result.name}")
+    if verbose:
+        print(f"Discovering {hub_path}...")
+
+    config = discover_experiment(hub_path)
 
     if verbose:
-        print(f"Loading {result.name} from {result.hub_path}")
+        print(f"  Found {len(config.subsets)} subsets")
+        print(f"  Seeds: {config.seeds}")
+        print(f"  Temperatures: {config.temperatures}")
 
-    return load_datasets_by_seed(
-        dataset_path=result.hub_path,
-        seeds=seeds,
-        subset_template=result.subset_template,
-        filter_strings=filter_strings,
-        temperature=temperature,
-        verbose=verbose,
-    )
+    return load_experiment_data(config, seeds, temperature, verbose)
 
 
-def get_available_subsets(
-    dataset_path: str,
-    seed: Optional[int] = None,
-    temperature: Optional[float] = None,
-) -> list[str]:
-    """Get available subset names for a dataset.
-
-    Useful for discovering what configurations are available.
+def load_multiple_experiments(
+    hub_paths: list[str],
+    seeds: Optional[list[int]] = None,
+    temperature: Optional[float | tuple] = None,
+    verbose: bool = True,
+) -> dict[str, dict[int, Any]]:
+    """Load datasets from multiple hub paths.
 
     Args:
-        dataset_path: Hugging Face Hub dataset path
-        seed: Filter by seed value (optional)
-        temperature: Filter by temperature value (optional)
+        hub_paths: List of HuggingFace Hub dataset paths
+        seeds: Specific seeds to load (default: all discovered per experiment)
+        temperature: Temperature filter
+        verbose: Print progress
 
     Returns:
-        List of matching subset names
+        Nested dict: {hub_path: {seed: Dataset}}
     """
-    configs = get_dataset_config_names(dataset_path)
+    results = {}
 
-    if seed is not None:
-        configs = [c for c in configs if f"seed-{seed}" in c]
+    for hub_path in hub_paths:
+        if verbose:
+            print(f"\n=== {hub_path} ===")
+        results[hub_path] = load_from_hub_path(hub_path, seeds, temperature, verbose)
 
-    if temperature is not None:
-        configs = [c for c in configs if f"T-{temperature}" in c]
+    return results
 
-    return sorted(configs)
+
+def get_available_configs(hub_path: str) -> list[str]:
+    """Get all available subset names for a hub dataset.
+
+    Args:
+        hub_path: HuggingFace Hub dataset path
+
+    Returns:
+        List of subset names (sorted)
+    """
+    config = discover_experiment(hub_path)
+    return sorted(s.raw_name for s in config.subsets)
+
+
+def summarize_experiment(hub_path: str) -> dict[str, Any]:
+    """Get a summary of an experiment's available configurations.
+
+    Args:
+        hub_path: HuggingFace Hub dataset path
+
+    Returns:
+        Dictionary with experiment summary
+    """
+    config = discover_experiment(hub_path)
+
+    return {
+        "hub_path": hub_path,
+        "approach": config.approach,
+        "model": config.model,
+        "strategy": config.strategy,
+        "seeds": config.seeds,
+        "temperatures": config.temperatures,
+        "datasets": config.datasets,
+        "total_subsets": len(config.subsets),
+        "subsets_by_seed": {
+            seed: len(subsets)
+            for seed, subsets in config.group_by_seed().items()
+        },
+        "subsets_by_temperature": {
+            str(temp): len(subsets)
+            for temp, subsets in config.group_by_temperature().items()
+        },
+    }
+
+
+def load_experiment_data_by_temperature(
+    config: ExperimentConfig,
+    seeds: Optional[list[int]] = None,
+    temperatures: Optional[list[float | tuple]] = None,
+    verbose: bool = True,
+) -> dict[float | tuple, dict[int, Any]]:
+    """Load datasets organized by temperature, then by seed.
+
+    This is the recommended function for temperature comparison analysis.
+    Returns data in a structure that makes it easy to compare across temperatures.
+
+    Args:
+        config: ExperimentConfig from discover_experiment()
+        seeds: Specific seeds to load (default: all discovered seeds)
+        temperatures: Specific temperatures to load (default: all discovered)
+        verbose: Print progress messages
+
+    Returns:
+        Nested dict: {temperature: {seed: Dataset}}
+        Temperature is float for default strategy, tuple for hnc
+
+    Example:
+        >>> config = discover_experiment("ENSEONG/default-aime25-Qwen2.5-1.5B-Instruct-bon")
+        >>> data = load_experiment_data_by_temperature(config)
+        >>> # data[0.4][42] = Dataset for T=0.4, seed=42
+        >>> # data[0.8][42] = Dataset for T=0.8, seed=42
+    """
+    seeds = seeds or config.seeds
+    temperatures = temperatures or config.temperatures
+    datasets: dict[float | tuple, dict[int, Any]] = {}
+
+    for temp in temperatures:
+        if verbose:
+            temp_str = f"temps_{temp}" if isinstance(temp, tuple) else f"T={temp}"
+            print(f"\nLoading temperature {temp_str}...")
+
+        datasets[temp] = {}
+
+        for seed in seeds:
+            subset_name = config.get_subset_name(seed, temp)
+            if not subset_name:
+                if verbose:
+                    print(f"  Warning: No subset found for seed {seed}, temp {temp}")
+                continue
+
+            try:
+                if verbose:
+                    short_name = subset_name[:50] + "..." if len(subset_name) > 50 else subset_name
+                    print(f"  Loading seed {seed}: {short_name}")
+                dataset = load_dataset(config.hub_path, subset_name)
+                datasets[temp][seed] = dataset
+            except Exception as e:
+                if verbose:
+                    print(f"  Error loading seed {seed}: {e}")
+
+    return datasets
+
+
+def load_all_experiment_data(
+    config: ExperimentConfig,
+    verbose: bool = True,
+) -> dict[tuple[float | tuple, int], Any]:
+    """Load all datasets for all temperature/seed combinations.
+
+    Returns a flat dictionary with (temperature, seed) tuples as keys.
+
+    Args:
+        config: ExperimentConfig from discover_experiment()
+        verbose: Print progress messages
+
+    Returns:
+        Dict mapping (temperature, seed) -> Dataset
+
+    Example:
+        >>> config = discover_experiment("ENSEONG/default-aime25-Qwen2.5-1.5B-Instruct-bon")
+        >>> data = load_all_experiment_data(config)
+        >>> dataset = data[(0.4, 42)]  # Dataset for T=0.4, seed=42
+    """
+    datasets = {}
+
+    all_configs = config.iter_all_configs()
+    if verbose:
+        print(f"Loading {len(all_configs)} configurations...")
+
+    for seed, temp, subset_name in all_configs:
+        try:
+            if verbose:
+                temp_str = f"temps_{temp}" if isinstance(temp, tuple) else f"T={temp}"
+                print(f"  Loading {temp_str}, seed={seed}...")
+            dataset = load_dataset(config.hub_path, subset_name)
+            datasets[(temp, seed)] = dataset
+        except Exception as e:
+            if verbose:
+                print(f"  Error: {e}")
+
+    return datasets
