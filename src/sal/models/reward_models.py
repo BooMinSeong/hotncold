@@ -711,7 +711,7 @@ class VLLMRewardAPI(VLLMRewardBase):
         for attempt in range(self.search_config.prm_api_max_retries):
             try:
                 response = client.post(
-                    "/score",
+                    "/pooling",
                     json=request_data,
                 )
                 response.raise_for_status()

@@ -135,8 +135,6 @@ def main():
         "vllm.entrypoints.openai.api_server",
         "--model",
         args.model,
-        "--task",
-        "reward",
         "--port",
         str(port),
         "--trust-remote-code",
