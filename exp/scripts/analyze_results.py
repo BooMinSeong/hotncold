@@ -45,6 +45,27 @@ from analysis import (
 )
 
 
+def generate_output_dir_from_category(category: str) -> str:
+    """Generate output directory from category name.
+
+    Examples:
+        math500_Qwen2.5-1.5B -> exp/analysis_output-MATH500-Qwen2.5-1.5B
+        math500_Qwen2.5-1.5B_hnc -> exp/analysis_output-MATH500-Qwen2.5-1.5B_hnc
+        aime25_Qwen2.5-3B -> exp/analysis_output-AIME25-Qwen2.5-3B
+
+    Returns:
+        Output directory path based on category
+    """
+    parts = category.split("_", 1)  # Split only on first underscore
+    if len(parts) < 2:
+        return "exp/analysis_output"
+
+    dataset = parts[0].upper()  # math500 -> MATH500, aime25 -> AIME25
+    model_and_strategy = parts[1]  # Qwen2.5-1.5B or Qwen2.5-1.5B_hnc
+
+    return f"exp/analysis_output-{dataset}-{model_and_strategy}"
+
+
 def parse_args():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
@@ -99,7 +120,7 @@ def parse_args():
         "--output-dir",
         type=str,
         default="exp/analysis_output",
-        help="Output directory for results",
+        help="Output directory for results (auto-generated from category if not specified)",
     )
     parser.add_argument(
         "--no-plots",
@@ -1157,6 +1178,12 @@ def main():
 
     # Remove duplicates while preserving order
     hub_paths = list(dict.fromkeys(hub_paths))
+
+    # Auto-generate output directory from category if not explicitly specified
+    if args.category and args.output_dir == "exp/analysis_output":
+        first_category = args.category.split(",")[0].strip()
+        args.output_dir = generate_output_dir_from_category(first_category)
+        print(f"Auto-generated output directory: {args.output_dir}")
 
     print(f"\nAnalyzing {len(hub_paths)} experiment(s)")
 

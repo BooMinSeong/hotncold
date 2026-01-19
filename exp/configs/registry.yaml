@@ -20,7 +20,7 @@ hub_paths:
   # =============================================================================
   # MATH-500 Dataset - HNC Strategy (Dynamic Temperature)
   # =============================================================================
-  math500_hnc:
+  math500_Qwen2.5-1.5B_hnc:
     - ENSEONG/hnc-Qwen2.5-1.5B-Instruct-bon
     - ENSEONG/hnc-Qwen2.5-1.5B-Instruct-beam_search
     - ENSEONG/hnc-Qwen2.5-1.5B-Instruct-dvts
@@ -28,12 +28,12 @@ hub_paths:
   # =============================================================================
   # MATH-500 Dataset - Default Strategy (Fixed Temperature)
   # =============================================================================
-  math500_1.5B:
+  math500_Qwen2.5-1.5B:
     - ENSEONG/default-MATH-500-Qwen2.5-1.5B-Instruct-bon
     - ENSEONG/default-MATH-500-Qwen2.5-1.5B-Instruct-beam_search
     - ENSEONG/default-MATH-500-Qwen2.5-1.5B-Instruct-dvts
 
-  math500_3B:
+  math500_Qwen2.5-3B:
     - ENSEONG/default-MATH-500-Qwen2.5-3B-Instruct-bon
     - ENSEONG/default-MATH-500-Qwen2.5-3B-Instruct-beam_search
     - ENSEONG/default-MATH-500-Qwen2.5-3B-Instruct-dvts
@@ -41,7 +41,7 @@ hub_paths:
   # =============================================================================
   # AIME25 Dataset - Qwen2.5-1.5B-Instruct
   # =============================================================================
-  aime25_1.5B:
+  aime25_Qwen2.5-1.5B:
     - ENSEONG/default-aime25-Qwen2.5-1.5B-Instruct-bon
     - ENSEONG/default-aime25-Qwen2.5-1.5B-Instruct-beam_search
     - ENSEONG/default-aime25-Qwen2.5-1.5B-Instruct-dvts
@@ -49,7 +49,7 @@ hub_paths:
   # =============================================================================
   # AIME25 Dataset - Qwen2.5-3B-Instruct
   # =============================================================================
-  aime25_3B:
+  aime25_Qwen2.5-3B:
     - ENSEONG/default-aime25-Qwen2.5-3B-Instruct-bon
     - ENSEONG/default-aime25-Qwen2.5-3B-Instruct-beam_search
     - ENSEONG/default-aime25-Qwen2.5-3B-Instruct-dvts
