@@ -29,14 +29,14 @@ hub_paths:
   # MATH-500 Dataset - Default Strategy (Fixed Temperature)
   # =============================================================================
   math500_1.5B:
-    - ENSEONG/default-Qwen2.5-1.5B-Instruct-bon
-    - ENSEONG/default-Qwen2.5-1.5B-Instruct-beam_search
-    - ENSEONG/default-Qwen2.5-1.5B-Instruct-dvts
+    - ENSEONG/default-MATH-500-Qwen2.5-1.5B-Instruct-bon
+    - ENSEONG/default-MATH-500-Qwen2.5-1.5B-Instruct-beam_search
+    - ENSEONG/default-MATH-500-Qwen2.5-1.5B-Instruct-dvts
 
   math500_3B:
-    - ENSEONG/default-Qwen2.5-3B-Instruct-bon
-    - ENSEONG/default-Qwen2.5-3B-Instruct-beam_search
-    - ENSEONG/default-Qwen2.5-3B-Instruct-dvts
+    - ENSEONG/default-MATH-500-Qwen2.5-3B-Instruct-bon
+    - ENSEONG/default-MATH-500-Qwen2.5-3B-Instruct-beam_search
+    - ENSEONG/default-MATH-500-Qwen2.5-3B-Instruct-dvts
 
   # =============================================================================
   # AIME25 Dataset - Qwen2.5-1.5B-Instruct
