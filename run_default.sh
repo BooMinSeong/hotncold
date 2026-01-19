@@ -3,7 +3,7 @@
 SEEDS=(0 42 64)
 SEARCH_METHODS=("best_of_n.yaml" "beam_search.yaml" "dvts.yaml")
 METHOD_NAMES=("bon" "beam_search" "dvts")
-TEMPERATURE=0.4
+TEMPERATURE=0.8
 DATASET_NAME="HuggingFaceH4/MATH-500" # math-ai/aime25 "HuggingFaceH4/MATH-500"
 MODEL_NAME="Llama-3.2-1B-Instruct" # meta-llama/Llama-3.2-3B-Instruct # Qwen2.5-3B-Instruct
 

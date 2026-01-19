@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH --job-name=default_run # Job name
 # cpu, gpu Setting
-# SBATCH --qos=hpgpu
-#SBATCH --partition=L40S
+#SBATCH --qos=hpgpu
+#SBATCH --partition=A100-80GB
 #SBATCH --exclude=n80
 #SBATCH --gres=gpu:1                   # Number of GPUs (per node)
 #SBATCH --cpus-per-task=8              # CPU cores/threads
