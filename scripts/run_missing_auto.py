@@ -50,7 +50,7 @@ class AutoRunConfig:
     chunk_size: int = 50  # Split missing ranges into chunks of this size
 
     seeds: List[int] = field(default_factory=lambda: [0, 42, 64])
-    temperatures: List[float] = field(default_factory=lambda: [0.4, 0.8])
+    temperatures: List[float] = field(default_factory=lambda: [0.1, 0.2, 0.4, 0.8])
     methods: Dict[str, str] = field(default_factory=lambda: {
         "bon": "best_of_n.yaml",
         "beam_search": "beam_search.yaml",

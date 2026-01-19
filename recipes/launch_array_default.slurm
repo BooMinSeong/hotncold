@@ -5,9 +5,9 @@
 #SBATCH --partition=L40S
 #SBATCH --exclude=n80
 #SBATCH --gres=gpu:1                   # Number of GPUs (per node)
-#SBATCH --cpus-per-task=4              # CPU cores/threads
+#SBATCH --cpus-per-task=8              # CPU cores/threads
 
-#SBATCH --array=1-1%10 # Array range (this creates 10 tasks with IDs from 1 to 10, with max 10 tasks concurrently)
+#SBATCH --array=1-10%10 # Array range (this creates 10 tasks with IDs from 1 to 10, with max 10 tasks concurrently)
 #SBATCH --output=logs/%x/%A/task_%a.out
 #SBATCH --error=logs/%x/%A/task_%a.err
 #SBATCH --time=12:00:00

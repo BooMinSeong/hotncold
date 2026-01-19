@@ -1,8 +1,9 @@
 # refer to src/sal/config.py for more options
 
+model_path: meta-llama/Llama-3.2-1B-Instruct
 filter_duplicates: true
 approach: beam_search
-n: 4
+n: 64
 search_batch_size: 1  # DO NOT CHANGE!
-num_samples: 10       # REMOVE THIS LINE TO RUN ON THE WHOLE DATASET
+prm_batch_size: 1
 seed: 0
