@@ -71,8 +71,19 @@ from .difficulty import (
     ProblemBaseline,
     compute_difficulty_statistics,
     compute_problem_baselines,
+    compute_problem_baselines_from_preds,
     get_problems_by_difficulty,
+    stratify_by_absolute_difficulty,
     stratify_by_difficulty,
+)
+
+# Difficulty-temperature analysis
+from .difficulty_temperature import (
+    DEFAULT_DIFFICULTY_THRESHOLDS,
+    analyze_temperature_by_difficulty,
+    compute_universal_difficulty_baselines,
+    generate_difficulty_temperature_plots,
+    generate_difficulty_temperature_report,
 )
 
 # Visualization
@@ -123,9 +134,17 @@ __all__ = [
     "ProblemBaseline",
     "DifficultyLevel",
     "compute_problem_baselines",
+    "compute_problem_baselines_from_preds",
     "stratify_by_difficulty",
+    "stratify_by_absolute_difficulty",
     "get_problems_by_difficulty",
     "compute_difficulty_statistics",
+    # Difficulty-temperature analysis
+    "DEFAULT_DIFFICULTY_THRESHOLDS",
+    "compute_universal_difficulty_baselines",
+    "analyze_temperature_by_difficulty",
+    "generate_difficulty_temperature_plots",
+    "generate_difficulty_temperature_report",
     # Visualization
     "setup_style",
     "save_figure",

@@ -143,6 +143,109 @@ def compute_problem_baselines(
     return baselines
 
 
+def compute_problem_baselines_from_preds(
+    datasets: dict[str, dict[int, Any]],
+    aggregate_across_approaches: bool = True,
+    verbose: bool = True,
+) -> dict[str, ProblemBaseline]:
+    """Compute baseline difficulty for each problem using preds field.
+
+    Similar to compute_problem_baselines, but uses the 'preds' field directly
+    instead of parsing completions. This is faster when predictions are pre-parsed.
+
+    For each unique problem:
+    1. Collect all predictions across seeds and approaches
+    2. Evaluate each prediction with math_verify
+    3. Compute mean accuracy
+
+    Args:
+        datasets: Nested dict {approach: {seed: Dataset}}
+        aggregate_across_approaches: If True, average across all approaches.
+                                     If False, keep separate per approach.
+        verbose: Print progress messages
+
+    Returns:
+        Dict mapping problem key to ProblemBaseline.
+        Key is unique_id if aggregating, or "{approach}:{unique_id}" otherwise.
+
+    Example:
+        >>> baselines = compute_problem_baselines_from_preds(datasets)
+        >>> for pid, baseline in baselines.items():
+        ...     print(f"{pid}: {baseline.mean_accuracy:.3f} ({baseline.num_evaluations} evals)")
+    """
+    from math_verify import parse, verify
+
+    if verbose:
+        print("\n  Computing problem baselines from preds...")
+
+    # Collect all evaluations per problem
+    problem_evaluations = defaultdict(list)
+    problem_metadata = {}  # Store problem text and answer
+
+    for approach, seeds_data in datasets.items():
+        for seed, dataset in seeds_data.items():
+            if "train" in dataset:
+                dataset = dataset["train"]
+
+            iterator = tqdm(
+                dataset,
+                desc=f"    Evaluating {approach} seed {seed}",
+                leave=False,
+                disable=not verbose,
+            )
+
+            for problem in iterator:
+                unique_id = problem.get("unique_id", problem.get("problem", ""))
+                if not unique_id:
+                    continue
+
+                # Store metadata (only once per problem)
+                if unique_id not in problem_metadata:
+                    problem_metadata[unique_id] = {
+                        "problem_text": problem.get("problem", ""),
+                        "answer": problem["answer"],
+                    }
+
+                # Parse gold answer once
+                gold_answer = problem["answer"]
+                try:
+                    gold = parse("\\boxed{" + gold_answer + "}")
+                except Exception:
+                    # Skip problems with unparseable gold answers
+                    continue
+
+                # Evaluate all predictions
+                preds = problem.get("preds", [])
+                for pred in preds:
+                    try:
+                        pred_parsed = parse("\\boxed{" + pred + "}")
+                        is_correct = verify(gold, pred_parsed)
+                    except Exception:
+                        is_correct = False
+
+                    key = unique_id if aggregate_across_approaches else f"{approach}:{unique_id}"
+                    problem_evaluations[key].append(is_correct)
+
+    # Compute mean accuracy per problem
+    baselines = {}
+    for problem_key, evaluations in problem_evaluations.items():
+        unique_id = problem_key.split(":")[-1] if ":" in problem_key else problem_key
+        mean_acc = sum(evaluations) / len(evaluations) if evaluations else 0.0
+
+        baselines[problem_key] = ProblemBaseline(
+            unique_id=unique_id,
+            problem_text=problem_metadata.get(unique_id, {}).get("problem_text", ""),
+            answer=problem_metadata.get(unique_id, {}).get("answer", ""),
+            mean_accuracy=mean_acc,
+            num_evaluations=len(evaluations),
+        )
+
+    if verbose:
+        print(f"  Computed baselines for {len(baselines)} problems")
+
+    return baselines
+
+
 def stratify_by_difficulty(
     baselines: dict[str, ProblemBaseline],
     num_levels: int = 5,
@@ -206,6 +309,76 @@ def stratify_by_difficulty(
                 for pid, b in baselines.items()
                 if min_acc <= b.mean_accuracy < max_acc
             ]
+
+        levels[level] = DifficultyLevel(
+            level=level,
+            min_accuracy=min_acc,
+            max_accuracy=max_acc,
+            problem_count=len(level_problems),
+            problem_ids=level_problems,
+        )
+
+        if verbose:
+            print(
+                f"    Level {level}: {len(level_problems)} problems, "
+                f"accuracy [{min_acc:.3f}, {max_acc:.3f}]"
+            )
+
+    return levels
+
+
+def stratify_by_absolute_difficulty(
+    baselines: dict[str, ProblemBaseline],
+    thresholds: dict[int, tuple[float, float]],
+    verbose: bool = True,
+) -> dict[int, DifficultyLevel]:
+    """Stratify problems into difficulty levels based on absolute accuracy thresholds.
+
+    Unlike stratify_by_difficulty which uses percentiles, this function uses
+    fixed accuracy ranges. This allows comparing difficulty across different
+    datasets or experiments.
+
+    Args:
+        baselines: Dict mapping problem key to ProblemBaseline
+        thresholds: Dict mapping level number to (min_accuracy, max_accuracy) tuple.
+                   Example: {1: (0.8, 1.0), 2: (0.6, 0.8), ...}
+                   Level 1 should be easiest (highest accuracy),
+                   highest level number should be hardest (lowest accuracy).
+        verbose: Print progress messages
+
+    Returns:
+        Dict mapping level number to DifficultyLevel
+
+    Example:
+        >>> thresholds = {
+        ...     1: (0.8, 1.0),  # Easiest: 80-100% accuracy
+        ...     2: (0.6, 0.8),  # 60-80% accuracy
+        ...     3: (0.4, 0.6),  # 40-60% accuracy
+        ...     4: (0.2, 0.4),  # 20-40% accuracy
+        ...     5: (0.0, 0.2),  # Hardest: 0-20% accuracy
+        ... }
+        >>> levels = stratify_by_absolute_difficulty(baselines, thresholds)
+        >>> for level, info in sorted(levels.items()):
+        ...     print(f"Level {level}: {info.problem_count} problems")
+    """
+    if verbose:
+        print("\n  Stratifying by absolute difficulty thresholds...")
+
+    if not baselines:
+        if verbose:
+            print("  Warning: No baselines to stratify")
+        return {}
+
+    # Assign problems to levels
+    levels = {}
+    for level, (min_acc, max_acc) in sorted(thresholds.items()):
+        # Find problems in this range
+        # Use inclusive bounds on both ends for each level
+        level_problems = [
+            pid
+            for pid, b in baselines.items()
+            if min_acc <= b.mean_accuracy <= max_acc
+        ]
 
         levels[level] = DifficultyLevel(
             level=level,
