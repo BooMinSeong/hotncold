@@ -13,6 +13,7 @@ from typing import Any
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
+from datasets import Dataset
 from tqdm import tqdm
 
 from .difficulty import (
@@ -76,7 +77,7 @@ def compute_universal_difficulty_baselines(
 def filter_dataset_by_problems(
     dataset: Any,
     problem_ids: list[str],
-) -> list[dict]:
+) -> Dataset:
     """Filter dataset to only include specified problems.
 
     Args:
@@ -84,7 +85,7 @@ def filter_dataset_by_problems(
         problem_ids: List of problem unique_ids to include
 
     Returns:
-        List of filtered problem dictionaries
+        Filtered Dataset object
     """
     if "train" in dataset:
         dataset = dataset["train"]
@@ -97,7 +98,11 @@ def filter_dataset_by_problems(
         if unique_id in problem_ids_set:
             filtered.append(problem)
 
-    return filtered
+    # Convert list to Dataset
+    if filtered:
+        return Dataset.from_dict({k: [d[k] for d in filtered] for k in filtered[0].keys()})
+    else:
+        return Dataset.from_dict({})
 
 
 def analyze_temperature_by_difficulty(
@@ -161,9 +166,8 @@ def analyze_temperature_by_difficulty(
             filtered_datasets = {}
             for seed, dataset in datasets_by_temp[temp].items():
                 filtered = filter_dataset_by_problems(dataset, level_info.problem_ids)
-                if filtered:
-                    # Create a simple dict-based dataset
-                    filtered_datasets[seed] = {"train": filtered}
+                if len(filtered) > 0:
+                    filtered_datasets[seed] = filtered
 
             if not filtered_datasets:
                 if verbose:
