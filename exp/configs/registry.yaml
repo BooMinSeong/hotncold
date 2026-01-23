@@ -29,30 +29,30 @@ hub_paths:
   # MATH-500 Dataset - Default Strategy (Fixed Temperature)
   # =============================================================================
   math500_Qwen2.5-1.5B:
-    - ENSEONG/default-MATH-500-Qwen2.5-1.5B-Instruct-bon
-    - ENSEONG/default-MATH-500-Qwen2.5-1.5B-Instruct-beam_search
-    - ENSEONG/default-MATH-500-Qwen2.5-1.5B-Instruct-dvts
+    - ENSEONG/preprocessed-default-MATH-500-Qwen2.5-1.5B-Instruct-bon
+    - ENSEONG/preprocessed-default-MATH-500-Qwen2.5-1.5B-Instruct-beam_search
+    - ENSEONG/preprocessed-default-MATH-500-Qwen2.5-1.5B-Instruct-dvts
 
   math500_Qwen2.5-3B:
-    - ENSEONG/default-MATH-500-Qwen2.5-3B-Instruct-bon
-    - ENSEONG/default-MATH-500-Qwen2.5-3B-Instruct-beam_search
-    - ENSEONG/default-MATH-500-Qwen2.5-3B-Instruct-dvts
+    - ENSEONG/preprocessed-default-MATH-500-Qwen2.5-3B-Instruct-bon
+    - ENSEONG/preprocessed-default-MATH-500-Qwen2.5-3B-Instruct-beam_search
+    - ENSEONG/preprocessed-default-MATH-500-Qwen2.5-3B-Instruct-dvts
 
   # =============================================================================
   # AIME25 Dataset - Qwen2.5-1.5B-Instruct
   # =============================================================================
   aime25_Qwen2.5-1.5B:
-    - ENSEONG/default-aime25-Qwen2.5-1.5B-Instruct-bon
-    - ENSEONG/default-aime25-Qwen2.5-1.5B-Instruct-beam_search
-    - ENSEONG/default-aime25-Qwen2.5-1.5B-Instruct-dvts
+    - ENSEONG/preprocessed-default-aime25-Qwen2.5-1.5B-Instruct-bon
+    - ENSEONG/preprocessed-default-aime25-Qwen2.5-1.5B-Instruct-beam_search
+    - ENSEONG/preprocessed-default-aime25-Qwen2.5-1.5B-Instruct-dvts
 
   # =============================================================================
   # AIME25 Dataset - Qwen2.5-3B-Instruct
   # =============================================================================
   aime25_Qwen2.5-3B:
-    - ENSEONG/default-aime25-Qwen2.5-3B-Instruct-bon
-    - ENSEONG/default-aime25-Qwen2.5-3B-Instruct-beam_search
-    - ENSEONG/default-aime25-Qwen2.5-3B-Instruct-dvts
+    - ENSEONG/preprocessed-default-aime25-Qwen2.5-3B-Instruct-bon
+    - ENSEONG/preprocessed-default-aime25-Qwen2.5-3B-Instruct-beam_search
+    - ENSEONG/preprocessed-default-aime25-Qwen2.5-3B-Instruct-dvts
 
 # Output configuration (unchanged)
 output:

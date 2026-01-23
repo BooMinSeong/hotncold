@@ -38,36 +38,59 @@ DEFAULT_DIFFICULTY_THRESHOLDS = {
 
 def compute_universal_difficulty_baselines(
     datasets_by_temp: dict[float, dict[int, Any]],
+    reference_temp: float | None = None,
+    method: str = "maj",
+    n_samples: int | None = None,
     verbose: bool = True,
 ) -> dict[str, ProblemBaseline]:
-    """Compute universal difficulty baselines using all temperatures and seeds.
+    """Compute difficulty baselines using a reference temperature.
 
-    This creates a temperature-independent difficulty metric by pooling
-    all predictions across all temperatures and seeds.
+    This creates a temperature-independent difficulty metric by using
+    a single reference temperature (typically the lowest) as the baseline.
+    This allows us to identify problems that are inherently difficult
+    (low accuracy at reference temp) vs easy (high accuracy at reference temp).
+
+    The baseline is computed using a single field: is_correct_{method}@{n_samples}
+    (default: is_correct_maj@{max_n} for BoN majority voting at maximum samples).
 
     Args:
         datasets_by_temp: Nested dict {temperature: {seed: Dataset}}
+        reference_temp: Reference temperature to use for baseline.
+                       If None, uses the lowest temperature.
+        method: Which method to use for baseline (default: "maj" for majority voting)
+        n_samples: Number of samples to use. If None, uses the maximum available.
         verbose: Print progress messages
 
     Returns:
         Dict mapping problem unique_id to ProblemBaseline
     """
+    # Select reference temperature
+    if reference_temp is None:
+        reference_temp = min(datasets_by_temp.keys())
+
+    if reference_temp not in datasets_by_temp:
+        available_temps = sorted(datasets_by_temp.keys())
+        raise ValueError(
+            f"Reference temperature {reference_temp} not found. "
+            f"Available temperatures: {available_temps}"
+        )
+
     if verbose:
-        print("\nComputing universal difficulty baselines...")
-        print(f"  Using {len(datasets_by_temp)} temperatures with multiple seeds")
+        print("\nComputing difficulty baselines from reference temperature...")
+        print(f"  Reference temperature: {reference_temp}")
+        print(f"  Using {len(datasets_by_temp[reference_temp])} seeds")
+        print(f"  Baseline method: {method}")
 
-    # Flatten all temperatures into a single dict for baseline computation
-    # The function expects {approach: {seed: Dataset}}
-    # We'll use temperature values as "approach" keys
-    flattened = {}
-    for temp, seeds_data in datasets_by_temp.items():
-        # Use temperature as string key to act as "approach"
-        flattened[f"T{temp}"] = seeds_data
+    # Use only the reference temperature data
+    # Format as {approach: {seed: Dataset}} for baseline computation
+    reference_data = {f"T{reference_temp}": datasets_by_temp[reference_temp]}
 
-    # Compute baselines using preds field (faster than parsing completions)
+    # Compute baselines using specific field (is_correct_{method}@{n_samples})
     baselines = compute_problem_baselines_from_preds(
-        flattened,
-        aggregate_across_approaches=True,  # Aggregate across all temps
+        reference_data,
+        aggregate_across_approaches=True,  # Aggregate across seeds
+        method=method,
+        n_samples=n_samples,
         verbose=verbose,
     )
 
@@ -386,52 +409,59 @@ def generate_difficulty_temperature_plots(
 
             save_figure(fig, level_dir / f"temperature_comparison_{method}.png")
 
-    # 3. Temperature × Difficulty heatmap (using max n for naive method)
+    # 3. Temperature × Difficulty heatmap (using max n for each method)
     if verbose:
-        print("  Creating temperature-difficulty heatmap...")
+        print("  Creating temperature-difficulty heatmaps...")
 
-    # Extract max performance for each (level, temp) combination
-    heatmap_data = []
+    # Get all temperatures and levels
     temps = sorted(set(t for level_results in results.values() for t in level_results.keys()))
     levels = sorted(results.keys())
 
-    for level in levels:
-        row = []
-        for temp in temps:
-            if temp in results[level] and "naive" in results[level][temp]:
-                naive_data = results[level][temp]["naive"]
-                if naive_data:
-                    max_n = max(naive_data.keys())
-                    row.append(naive_data[max_n]["mean"])
+    # Create heatmap for each method
+    for method in ["naive", "weighted", "maj"]:
+        if verbose:
+            print(f"    Creating heatmap for {method} method...")
+
+        # Extract max performance for each (level, temp) combination
+        heatmap_data = []
+
+        for level in levels:
+            row = []
+            for temp in temps:
+                if temp in results[level] and method in results[level][temp]:
+                    method_data = results[level][temp][method]
+                    if method_data:
+                        max_n = max(method_data.keys())
+                        row.append(method_data[max_n]["mean"])
+                    else:
+                        row.append(0.0)
                 else:
                     row.append(0.0)
-            else:
-                row.append(0.0)
-        heatmap_data.append(row)
+            heatmap_data.append(row)
 
-    fig, ax = plt.subplots(figsize=(10, 8))
-    sns.heatmap(
-        heatmap_data,
-        annot=True,
-        fmt=".3f",
-        cmap="YlOrRd",
-        xticklabels=[f"T{t}" for t in temps],
-        yticklabels=[
-            f"L{lvl}\n{difficulty_levels[lvl].min_accuracy:.1f}-{difficulty_levels[lvl].max_accuracy:.1f}"
-            for lvl in levels
-        ],
-        cbar_kws={"label": "Accuracy"},
-        ax=ax,
-    )
-    ax.set_xlabel("Temperature", fontsize=12)
-    ax.set_ylabel("Difficulty Level (Accuracy Range)", fontsize=12)
-    ax.set_title(
-        "Temperature Performance Across Difficulty Levels\n(Naive method at max samples)",
-        fontsize=14,
-        fontweight="bold",
-    )
+        fig, ax = plt.subplots(figsize=(10, 8))
+        sns.heatmap(
+            heatmap_data,
+            annot=True,
+            fmt=".3f",
+            cmap="YlOrRd",
+            xticklabels=[f"T{t}" for t in temps],
+            yticklabels=[
+                f"L{lvl}\n{difficulty_levels[lvl].min_accuracy:.1f}-{difficulty_levels[lvl].max_accuracy:.1f}"
+                for lvl in levels
+            ],
+            cbar_kws={"label": "Accuracy"},
+            ax=ax,
+        )
+        ax.set_xlabel("Temperature", fontsize=12)
+        ax.set_ylabel("Difficulty Level (Accuracy Range)", fontsize=12)
+        ax.set_title(
+            f"Temperature Performance Across Difficulty Levels\n({method.capitalize()} method at max samples)",
+            fontsize=14,
+            fontweight="bold",
+        )
 
-    save_figure(fig, output_path / "temperature_difficulty_heatmap.png")
+        save_figure(fig, output_path / f"temperature_difficulty_heatmap_{method}.png")
 
     if verbose:
         print(f"  Saved plots to {output_dir}/")
@@ -441,6 +471,9 @@ def generate_difficulty_temperature_report(
     results: dict[int, dict[float, dict[str, dict[int, dict[str, float]]]]],
     difficulty_levels: dict[int, DifficultyLevel],
     output_path: str,
+    reference_temp: float | None = None,
+    baseline_method: str = "maj",
+    baseline_n: int | None = None,
     verbose: bool = True,
 ) -> None:
     """Generate markdown report for temperature-difficulty analysis.
@@ -449,6 +482,9 @@ def generate_difficulty_temperature_report(
         results: Analysis results from analyze_temperature_by_difficulty
         difficulty_levels: Difficulty level definitions
         output_path: Output path for markdown file
+        reference_temp: Reference temperature used for difficulty baseline
+        baseline_method: Method used for baseline (default: "maj")
+        baseline_n: Number of samples used for baseline (None = auto-detected max)
         verbose: Print progress messages
     """
     if verbose:
@@ -465,6 +501,14 @@ def generate_difficulty_temperature_report(
             "This report analyzes how different temperatures perform across "
             "problems of varying difficulty.\n\n"
         )
+        if reference_temp is not None:
+            baseline_field = f"`is_correct_{baseline_method}@{baseline_n if baseline_n else 'max'}`"
+            f.write(
+                f"**Difficulty Baseline:** Problems are categorized based on their "
+                f"accuracy using {baseline_field} at the reference temperature **T={reference_temp}**. "
+                f"This allows us to identify which temperatures improve performance on problems that "
+                f"are inherently difficult (low accuracy at T={reference_temp}).\n\n"
+            )
 
         # Difficulty distribution
         f.write("## Difficulty Distribution\n\n")

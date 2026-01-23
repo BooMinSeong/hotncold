@@ -55,6 +55,68 @@ python scripts/merge_chunks.py \
     --filter_strings seed-0
 ```
 
+### Preprocessing Results for Fast Analysis
+
+**IMPORTANT**: Before running analysis scripts, experiment results must be preprocessed. This is a **one-time operation** per experiment that pre-computes all prediction evaluations (using `math_verify`), providing **20-30x faster** analysis.
+
+```bash
+# Preprocess a single experiment
+python exp/scripts/preprocess_dataset.py \
+    --hub-path ENSEONG/default-MATH-500-Qwen2.5-1.5B-Instruct-bon \
+    --push-to-hub
+
+# Preprocess all experiments in a category (recommended)
+python exp/scripts/preprocess_dataset.py \
+    --category math500_Qwen2.5-1.5B \
+    --push-to-hub
+
+# Save locally instead of pushing to Hub
+python exp/scripts/preprocess_dataset.py \
+    --hub-path ENSEONG/default-MATH-500-Qwen2.5-1.5B-Instruct-bon \
+    --output-dir /tmp/preprocessed
+
+# Validate preprocessing correctness
+python exp/scripts/preprocess_dataset.py \
+    --hub-path ENSEONG/default-MATH-500-Qwen2.5-1.5B-Instruct-bon \
+    --push-to-hub \
+    --validate
+```
+
+**How it works**:
+- **Input**: Original experiment dataset with `pred_naive@N`, `pred_weighted@N`, `pred_maj@N` fields
+- **Process**: Evaluates all predictions using `math_verify.parse()` + `verify()`
+- **Output**: New dataset with added `is_correct_naive@N`, `is_correct_weighted@N`, `is_correct_maj@N` boolean fields
+- **Storage**: Preprocessed datasets are saved to Hub with `preprocessed-` prefix (e.g., `ENSEONG/preprocessed-default-MATH-500-...`)
+
+**Why preprocess?**
+- Analysis scripts need to evaluate thousands of predictions (e.g., 384,000 for MATH-500)
+- `math_verify` parsing/verification is computationally expensive
+- Preprocessing once eliminates this bottleneck from analysis
+- Result: Analysis that took 5-10 minutes now takes 10-30 seconds
+
+### Analyzing Results
+
+After preprocessing, use the unified analysis scripts:
+
+```bash
+# Analyze a single experiment
+python exp/scripts/analyze_results.py ENSEONG/preprocessed-default-MATH-500-Qwen2.5-1.5B-Instruct-bon
+
+# Analyze a category from registry
+python exp/scripts/analyze_results.py --category math500_Qwen2.5-1.5B
+
+# Temperature comparison analysis
+python exp/scripts/analyze_results.py --category math500_Qwen2.5-1.5B --analysis-type temperature_comparison
+
+# Difficulty-based temperature analysis
+python exp/scripts/analyze_difficulty_temperature.py \
+    --category math500_Qwen2.5-1.5B \
+    --approach bon \
+    --output-dir exp/analysis_output-MATH500-Qwen2.5-1.5B-difficulty
+```
+
+**Note**: Analysis scripts **require** preprocessed datasets. If you try to analyze a non-preprocessed dataset, you'll get an error message telling you to run preprocessing first.
+
 ### Training PRMs (requires TRL)
 ```bash
 # Install TRL dependencies
@@ -84,6 +146,26 @@ pip install -e '.[trl]'
   - `score.py`: Scoring completions with PRMs
   - `qwen_math_parser.py`: Answer extraction for MATH dataset evaluation
 
+### Experiment Analysis Structure (`exp/`)
+
+- **scripts/**: Analysis and preprocessing scripts
+  - `preprocess_dataset.py`: Preprocess experiment results by pre-computing evaluations (adds `is_correct_*` fields)
+  - `analyze_results.py`: Unified analysis script with auto-discovery (summary, HNC comparison, temperature comparison, model comparison)
+  - `analyze_difficulty_temperature.py`: Difficulty-stratified temperature performance analysis
+
+- **analysis/**: Core analysis modules
+  - `core.py`: Fundamental evaluation functions (`evaluate_answer`, `evaluate_result`)
+  - `metrics.py`: Accuracy computation from preprocessed datasets (uses `is_correct_*` fields for 20-30x speedup)
+  - `difficulty.py`: Problem difficulty stratification and baseline computation
+  - `difficulty_temperature.py`: Temperature-difficulty analysis utilities
+  - `preprocessing.py`: Preprocessing utilities (`preprocess_single_subset`, validation functions)
+  - `datasets.py`: Dataset loading with auto-discovery from Hub
+  - `discovery.py`: Automatic configuration discovery from Hub metadata
+  - `visualization.py`: Plotting utilities for reports
+
+- **configs/**: Configuration files
+  - `registry.yaml`: Registry of experiment Hub paths organized by category
+
 ### Search Algorithm Flow
 
 1. `scripts/test_time_compute.py` loads config, LLM (via vLLM), and PRM
@@ -112,6 +194,10 @@ Command-line arguments override config values.
 - Custom PRMs trained with TRL (see `recipes/training/`)
 
 ## Important Notes
+
+- **Preprocessing Required**: Analysis scripts require preprocessed datasets. Always run `exp/scripts/preprocess_dataset.py` on experiment results before analysis. This one-time preprocessing adds `is_correct_*` boolean fields that enable 20-30x faster analysis by eliminating expensive `math_verify` calls.
+
+- **Dataset Naming**: Preprocessed datasets use `preprocessed-` prefix (e.g., `ENSEONG/preprocessed-default-MATH-500-...`). Update registry paths to point to preprocessed versions after preprocessing.
 
 - **Chat Templates**: Default configs use a custom Llama 3 chat template optimized for math reasoning. For non-Llama models, set `--custom_chat_template=none`.
 

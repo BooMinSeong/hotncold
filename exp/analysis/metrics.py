@@ -23,13 +23,13 @@ def analyze_single_dataset(
     seed: int,
     verbose: bool = True,
 ) -> dict[str, dict[int, float]]:
-    """Analyze a single dataset and return accuracy by method and sample count.
+    """Analyze a single preprocessed dataset and return accuracy by method and sample count.
 
-    Evaluates all prediction keys (pred_naive@N, pred_weighted@N, pred_maj@N)
-    and computes accuracy for each.
+    This function uses preprocessed is_correct_* fields for fast analysis.
+    The dataset must be preprocessed using exp/scripts/preprocess_dataset.py.
 
     Args:
-        dataset: HuggingFace dataset (or dict with 'train' split)
+        dataset: Preprocessed HuggingFace dataset (or dict with 'train' split)
         dataset_name: Name for logging
         seed: Seed value for logging
         verbose: Whether to print progress
@@ -42,37 +42,36 @@ def analyze_single_dataset(
         >>> results = analyze_single_dataset(dataset, "default-1.5B-bon", 42)
         >>> print(results['naive'][64])  # naive accuracy with 64 samples
         0.756
+
+    Raises:
+        ValueError: If dataset is not preprocessed (no is_correct_* fields found)
     """
     results_by_method = {"naive": {}, "weighted": {}, "maj": {}}
 
     if "train" in dataset:
         dataset = dataset["train"]
 
-    # Find all prediction keys
-    pred_keys = [key for key in dataset.features.keys() if key.startswith("pred_")]
+    # Find all is_correct_* fields
+    is_correct_fields = [key for key in dataset.features.keys() if key.startswith("is_correct_")]
+
+    if not is_correct_fields:
+        raise ValueError(
+            f"Dataset {dataset_name} is not preprocessed. "
+            f"No is_correct_* fields found. "
+            f"Please run exp/scripts/preprocess_dataset.py first."
+        )
+
     if verbose:
-        print(f"  Found {len(pred_keys)} prediction keys to evaluate")
+        print(f"  Using {len(is_correct_fields)} preprocessed fields")
 
-    # Accumulate results for each key
-    results_accumulator = {key: [] for key in pred_keys}
+    # Directly aggregate boolean values
+    for field in is_correct_fields:
+        # Calculate accuracy as sum of True values divided by total
+        num_correct = sum(row[field] for row in dataset)
+        accuracy = num_correct / len(dataset) if len(dataset) > 0 else 0.0
 
-    # Evaluate all predictions
-    if verbose:
-        print(f"  Evaluating predictions...")
-    for data in tqdm(
-        dataset, desc=f"  {dataset_name} (seed {seed})", leave=False, disable=not verbose
-    ):
-        for key in pred_keys:
-            result = evaluate_result(data, key)
-            results_accumulator[key].append(result)
-
-    # Calculate accuracy for each key
-    for key in pred_keys:
-        results = results_accumulator[key]
-        accuracy = sum(results) / len(results) if results else 0.0
-
-        # Parse key: pred_method@number format
-        match = re.match(r"pred_(naive|weighted|maj)@(\d+)", key)
+        # Parse field name: is_correct_method@number format
+        match = re.match(r"is_correct_(naive|weighted|maj)@(\d+)", field)
         if match:
             method = match.group(1)
             n_samples = int(match.group(2))

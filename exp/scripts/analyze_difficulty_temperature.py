@@ -2,10 +2,12 @@
 """Difficulty-based temperature performance analysis script.
 
 This script analyzes how different temperatures perform across problems of
-varying difficulty levels, using absolute accuracy thresholds to define difficulty.
+varying difficulty levels. Difficulty is defined based on accuracy at a reference
+temperature (default: lowest temperature) using a specific metric field
+(default: is_correct_maj@{max_n} for BoN majority voting).
 
 Usage:
-    # Analyze from category
+    # Analyze from category (uses lowest temperature as reference, maj@max as baseline)
     python exp/scripts/analyze_difficulty_temperature.py \
         --category math500_Qwen2.5-1.5B \
         --approach bon \
@@ -14,6 +16,15 @@ Usage:
     # Analyze from hub path
     python exp/scripts/analyze_difficulty_temperature.py \
         --hub-path ENSEONG/default-MATH-500-Qwen2.5-1.5B-Instruct-bon \
+        --output-dir exp/analysis_output-MATH500-Qwen2.5-1.5B-difficulty
+
+    # Specify custom reference temperature and baseline method
+    python exp/scripts/analyze_difficulty_temperature.py \
+        --category math500_Qwen2.5-1.5B \
+        --approach bon \
+        --reference-temp 0.1 \
+        --baseline-method maj \
+        --baseline-n 64 \
         --output-dir exp/analysis_output-MATH500-Qwen2.5-1.5B-difficulty
 
     # Customize difficulty thresholds
@@ -26,6 +37,7 @@ Usage:
 import argparse
 import json
 import os
+import shutil
 import sys
 from pathlib import Path
 from typing import Any, Optional
@@ -89,6 +101,23 @@ def parse_args():
         "--thresholds",
         nargs="+",
         help='Custom difficulty thresholds as "level:min,max" (e.g., "1:0.8,1.0" "2:0.6,0.8")',
+    )
+    parser.add_argument(
+        "--reference-temp",
+        type=float,
+        help="Reference temperature for difficulty baseline (default: lowest temperature)",
+    )
+    parser.add_argument(
+        "--baseline-method",
+        type=str,
+        default="maj",
+        choices=["naive", "weighted", "maj"],
+        help="Method to use for difficulty baseline (default: maj for majority voting)",
+    )
+    parser.add_argument(
+        "--baseline-n",
+        type=int,
+        help="Number of samples to use for baseline (default: maximum available)",
     )
 
     # Output options
@@ -214,6 +243,13 @@ def main():
     print("=" * 70)
     print(f"\nHub path: {hub_path}")
 
+    # Clean output directory to avoid stale files from previous runs
+    if os.path.exists(args.output_dir):
+        if args.verbose:
+            print(f"\nCleaning output directory: {args.output_dir}")
+        shutil.rmtree(args.output_dir)
+    os.makedirs(args.output_dir, exist_ok=True)
+
     # Parse difficulty thresholds
     if args.thresholds:
         try:
@@ -280,10 +316,13 @@ def main():
         print("Error: No datasets loaded")
         sys.exit(1)
 
-    # Compute universal difficulty baselines
+    # Compute difficulty baselines using reference temperature
     try:
         baselines = compute_universal_difficulty_baselines(
             datasets_by_temp,
+            reference_temp=args.reference_temp,
+            method=args.baseline_method,
+            n_samples=args.baseline_n,
             verbose=args.verbose,
         )
     except Exception as e:
@@ -300,14 +339,22 @@ def main():
         baselines_path = os.path.join(args.output_dir, "difficulty_baselines.json")
         os.makedirs(args.output_dir, exist_ok=True)
 
+        reference_temp_used = args.reference_temp if args.reference_temp else min(datasets_by_temp.keys())
+
         baselines_data = {
-            pid: {
-                "unique_id": b.unique_id,
-                "mean_accuracy": b.mean_accuracy,
-                "num_evaluations": b.num_evaluations,
-                "answer": b.answer,
+            "metadata": {
+                "reference_temperature": reference_temp_used,
+                "num_problems": len(baselines),
+            },
+            "problems": {
+                pid: {
+                    "unique_id": b.unique_id,
+                    "mean_accuracy": b.mean_accuracy,
+                    "num_evaluations": b.num_evaluations,
+                    "answer": b.answer,
+                }
+                for pid, b in baselines.items()
             }
-            for pid, b in baselines.items()
         }
 
         with open(baselines_path, "w") as f:
@@ -360,10 +407,15 @@ def main():
     if not args.no_report:
         try:
             report_path = os.path.join(args.output_dir, "difficulty_temperature_report.md")
+            # Determine which reference temp was used
+            reference_temp_used = args.reference_temp if args.reference_temp else min(datasets_by_temp.keys())
             generate_difficulty_temperature_report(
                 results,
                 difficulty_levels,
                 report_path,
+                reference_temp=reference_temp_used,
+                baseline_method=args.baseline_method,
+                baseline_n=args.baseline_n,
                 verbose=args.verbose,
             )
         except Exception as e:

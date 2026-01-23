@@ -518,7 +518,8 @@ def plot_hnc_method_comparison(
     ax.set_title(f"{approach.replace('_', ' ').title()} - {method.upper()}\nHNC vs Default",
                 fontsize=14, fontweight="bold")
     ax.legend(loc="best")
-    ax.grid(True, alpha=0.3)
+    ax.set_xscale("log", base=2)
+    ax.grid(True, alpha=0.3, which="both")
 
     plt.tight_layout()
     save_figure(fig, output_path)
@@ -825,7 +826,8 @@ def plot_temperature_method_comparison(
     ax.set_title(f"{model_short} - {approach.replace('_', ' ').title()} - {method.upper()}\nTemperature Comparison",
                 fontsize=14, fontweight="bold")
     ax.legend(loc="best")
-    ax.grid(True, alpha=0.3)
+    ax.set_xscale("log", base=2)
+    ax.grid(True, alpha=0.3, which="both")
 
     plt.tight_layout()
     save_figure(fig, output_path)
@@ -1084,7 +1086,8 @@ def plot_model_scaling_curves(
     ax.set_title(f"{approach.replace('_', ' ').title()}\nModel Comparison",
                 fontsize=14, fontweight="bold")
     ax.legend(loc="best")
-    ax.grid(True, alpha=0.3)
+    ax.set_xscale("log", base=2)
+    ax.grid(True, alpha=0.3, which="both")
 
     plt.tight_layout()
     save_figure(fig, output_path)

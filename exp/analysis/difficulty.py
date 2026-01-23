@@ -146,22 +146,25 @@ def compute_problem_baselines(
 def compute_problem_baselines_from_preds(
     datasets: dict[str, dict[int, Any]],
     aggregate_across_approaches: bool = True,
+    method: str = "maj",
+    n_samples: int | None = None,
     verbose: bool = True,
 ) -> dict[str, ProblemBaseline]:
-    """Compute baseline difficulty for each problem using preds field.
+    """Compute baseline difficulty for each problem using preprocessed is_correct_* fields.
 
-    Similar to compute_problem_baselines, but uses the 'preds' field directly
-    instead of parsing completions. This is faster when predictions are pre-parsed.
+    This function uses preprocessed is_correct_* fields for fast baseline computation.
+    The datasets must be preprocessed using exp/scripts/preprocess_dataset.py.
 
     For each unique problem:
-    1. Collect all predictions across seeds and approaches
-    2. Evaluate each prediction with math_verify
-    3. Compute mean accuracy
+    1. Extract is_correct_{method}@{n_samples} value across seeds and approaches
+    2. Compute mean accuracy (no evaluation needed - just average booleans)
 
     Args:
         datasets: Nested dict {approach: {seed: Dataset}}
         aggregate_across_approaches: If True, average across all approaches.
                                      If False, keep separate per approach.
+        method: Which method to use for baseline (default: "maj" for majority voting)
+        n_samples: Number of samples to use. If None, uses the maximum available.
         verbose: Print progress messages
 
     Returns:
@@ -169,16 +172,53 @@ def compute_problem_baselines_from_preds(
         Key is unique_id if aggregating, or "{approach}:{unique_id}" otherwise.
 
     Example:
-        >>> baselines = compute_problem_baselines_from_preds(datasets)
+        >>> baselines = compute_problem_baselines_from_preds(datasets, method="maj", n_samples=64)
         >>> for pid, baseline in baselines.items():
         ...     print(f"{pid}: {baseline.mean_accuracy:.3f} ({baseline.num_evaluations} evals)")
+
+    Raises:
+        ValueError: If datasets are not preprocessed (no is_correct_* fields found)
     """
-    from math_verify import parse, verify
+    if verbose:
+        print("\n  Computing problem baselines from preprocessed fields...")
+
+    # Find max n_samples if not specified
+    if n_samples is None:
+        # Get a sample dataset to find available n_samples
+        sample_dataset = None
+        for seeds_data in datasets.values():
+            for dataset in seeds_data.values():
+                sample_dataset = dataset["train"] if "train" in dataset else dataset
+                break
+            if sample_dataset:
+                break
+
+        if sample_dataset is None:
+            raise ValueError("No datasets found")
+
+        # Extract n_samples from is_correct_{method}@N fields
+        import re
+        pattern = re.compile(rf"is_correct_{method}@(\d+)")
+        available_n = []
+        for field in sample_dataset.features.keys():
+            match = pattern.match(field)
+            if match:
+                available_n.append(int(match.group(1)))
+
+        if not available_n:
+            raise ValueError(f"No is_correct_{method}@N fields found in dataset")
+
+        n_samples = max(available_n)
+        if verbose:
+            print(f"    Auto-detected max n_samples: {n_samples}")
+
+    # Target field to use for baseline
+    target_field = f"is_correct_{method}@{n_samples}"
 
     if verbose:
-        print("\n  Computing problem baselines from preds...")
+        print(f"    Using field: {target_field}")
 
-    # Collect all evaluations per problem
+    # Collect all is_correct values per problem
     problem_evaluations = defaultdict(list)
     problem_metadata = {}  # Store problem text and answer
 
@@ -187,14 +227,17 @@ def compute_problem_baselines_from_preds(
             if "train" in dataset:
                 dataset = dataset["train"]
 
-            iterator = tqdm(
-                dataset,
-                desc=f"    Evaluating {approach} seed {seed}",
-                leave=False,
-                disable=not verbose,
-            )
+            # Check if dataset is preprocessed and has target field
+            if target_field not in dataset.features:
+                raise ValueError(
+                    f"Dataset for {approach} seed {seed} does not have field '{target_field}'. "
+                    f"Please run exp/scripts/preprocess_dataset.py first."
+                )
 
-            for problem in iterator:
+            if verbose and seed == list(seeds_data.keys())[0]:  # Print once per approach
+                print(f"    Processing {approach}")
+
+            for problem in dataset:
                 unique_id = problem.get("unique_id", problem.get("problem", ""))
                 if not unique_id:
                     continue
@@ -206,25 +249,10 @@ def compute_problem_baselines_from_preds(
                         "answer": problem["answer"],
                     }
 
-                # Parse gold answer once
-                gold_answer = problem["answer"]
-                try:
-                    gold = parse("\\boxed{" + gold_answer + "}")
-                except Exception:
-                    # Skip problems with unparseable gold answers
-                    continue
-
-                # Evaluate all predictions
-                preds = problem.get("preds", [])
-                for pred in preds:
-                    try:
-                        pred_parsed = parse("\\boxed{" + pred + "}")
-                        is_correct = verify(gold, pred_parsed)
-                    except Exception:
-                        is_correct = False
-
-                    key = unique_id if aggregate_across_approaches else f"{approach}:{unique_id}"
-                    problem_evaluations[key].append(is_correct)
+                # Collect target field value for this problem
+                key = unique_id if aggregate_across_approaches else f"{approach}:{unique_id}"
+                is_correct = problem[target_field]
+                problem_evaluations[key].append(is_correct)
 
     # Compute mean accuracy per problem
     baselines = {}
