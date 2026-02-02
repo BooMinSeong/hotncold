@@ -66,16 +66,19 @@ def analyze_single_dataset(
 
     # Directly aggregate boolean values
     for field in is_correct_fields:
+        # Parse field name: is_correct_method@number format
+        # Skip fields that don't match (like is_correct_preds)
+        match = re.match(r"is_correct_(naive|weighted|maj)@(\d+)", field)
+        if not match:
+            continue
+
+        method = match.group(1)
+        n_samples = int(match.group(2))
+
         # Calculate accuracy as sum of True values divided by total
         num_correct = sum(row[field] for row in dataset)
         accuracy = num_correct / len(dataset) if len(dataset) > 0 else 0.0
-
-        # Parse field name: is_correct_method@number format
-        match = re.match(r"is_correct_(naive|weighted|maj)@(\d+)", field)
-        if match:
-            method = match.group(1)
-            n_samples = int(match.group(2))
-            results_by_method[method][n_samples] = accuracy
+        results_by_method[method][n_samples] = accuracy
 
     return results_by_method
 

@@ -321,10 +321,18 @@ def compute_problem_baselines_from_completions(
                     f"Please run preprocessing with updated code."
                 )
 
-            if verbose and seed == list(seeds_data.keys())[0]:  # Print once per approach
-                print(f"    Processing {approach}")
+            if verbose:
+                print(f"    Processing {approach} seed {seed}")
 
-            for problem in dataset:
+            # Add progress bar for dataset iteration
+            iterator = tqdm(
+                dataset,
+                desc=f"      {approach} seed {seed}",
+                leave=False,
+                disable=not verbose,
+            )
+
+            for problem in iterator:
                 unique_id = problem.get("unique_id", problem.get("problem", ""))
                 if not unique_id:
                     continue

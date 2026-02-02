@@ -1,0 +1,144 @@
+================================================================================
+  Temperature-Difficulty Performance Analysis: Qwen2.5-3B on MATH-500
+  Complete 2×2 Factorial Study (BoN vs DVTS × Reference Temperature)
+================================================================================
+
+✅ ANALYSIS COMPLETE - All phases implemented successfully
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 DELIVERABLES GENERATED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📁 Reports (6 documents, 1,109 lines total):
+   • INDEX.md                              - Master index with navigation
+   • README.md                             - Quick start guide
+   • synthesis_report.md                   - Executive summary ⭐
+   • comparative_analysis_report.md        - Detailed analysis
+   • algorithm_baseline_interactions.md    - Interaction effects
+   • compute_efficiency_analysis.md        - Scaling efficiency
+
+📊 Visualizations (5 high-res PNG files):
+   • difficulty_distributions_comparison.png    (256 KB)
+   • optimal_temperatures_comparison.png        (136 KB)
+   • base_capability_comparison.png             (253 KB)
+   • scaling_curves_by_level.png                (936 KB)
+   • algorithm_scaling_comparison.png           (344 KB)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔑 KEY FINDINGS (Top 5)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. ALGORITHM PERFORMANCE GAP
+   └─ DVTS beats BoN by 3.2% (0.566 vs 0.534) across all conditions
+   └─ Tree search + diversity → superior solution exploration
+
+2. REFERENCE TEMPERATURE IMPACT
+   └─ T=0.1 baseline identifies 14% more "easy" problems than T=0.8
+   └─ More reliable for difficulty stratification
+
+3. ROBUSTNESS-PERFORMANCE TRADEOFF
+   └─ BoN: 80% temperature consistency (robust, predictable)
+   └─ DVTS: 40% consistency (sensitive but higher accuracy)
+
+4. SURPRISING NON-LINEARITY
+   └─ Very hard problems DON'T always prefer high temperature!
+   └─ BoN optimal at T0.2 (not T0.8) for hardest problems
+   └─ Sweet spot between exploration and quality
+
+5. COMPUTE EFFICIENCY
+   └─ First doublings (N=1→4): 10-30% accuracy gains
+   └─ Plateau at N≥32: Diminishing returns apparent
+   └─ Early samples give best ROI
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+💡 RECOMMENDATIONS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+FOR PRACTITIONERS:
+  • Use DVTS when: Maximum accuracy critical, have tuning time
+  • Use BoN when: Need predictability, quick deployment
+  • Reference temperature: T=0.1 (recommended for both algorithms)
+  • Sample budget: N=8-16 for easy, N=32-64 for medium/hard
+
+FOR RESEARCHERS:
+  • Investigate: Why DVTS shows algorithm-baseline interaction?
+  • Explore: Adaptive temperature scheduling based on difficulty
+  • Test: Generalization across model scales (1.5B, 7B, 72B)
+  • Study: Per-problem mixed-temperature ensembles
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📐 EXPERIMENTAL DESIGN
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+2×2 Factorial Matrix:
+                     Ref Temp = 0.1          Ref Temp = 0.8
+  BoN              225/27/23/33/192        198/42/28/50/182
+  DVTS             241/32/21/21/185        219/54/36/29/162
+
+Model: Qwen2.5-3B-Instruct
+Dataset: MATH-500
+Sample Budgets: N ∈ {1, 2, 4, 8, 16, 32, 64}
+Temperatures: T ∈ {0.1, 0.2, 0.4, 0.8}
+Difficulty Levels: 5 bins (0.8-1.0, 0.6-0.8, 0.4-0.6, 0.2-0.4, 0.0-0.2)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📖 READING GUIDE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Recommended order:
+  1. README.md                    - Start here for overview
+  2. synthesis_report.md          - Executive summary ⭐ MAIN REPORT
+  3. comparative_analysis_report.md - Detailed metrics
+  4. Visualizations (PNG files)   - Key trends
+  5. compute_efficiency_analysis.md - Scaling insights
+  6. algorithm_baseline_interactions.md - Deep dive
+
+Quick reference:
+  • INDEX.md - Complete navigation and reference tables
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 ANALYSIS PHASES COMPLETED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✓ Phase 1: Data Understanding and Validation
+✓ Phase 2: Difficulty Stratification Analysis
+✓ Phase 3: Temperature Optimization Analysis
+✓ Phase 4: Algorithm Performance Comparison
+✓ Phase 5: Critical Findings and Insights
+✓ Phase 6: Visualization and Reporting
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔧 ANALYSIS SCRIPTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Location: exp/analysis/
+
+  • comparative_analysis.py   - Main comparison (reports + visualizations)
+  • synthesis_report.py        - Executive summary generator
+  • scaling_analysis.py         - Scaling curves + compute efficiency
+
+To regenerate:
+  uv run python exp/analysis/comparative_analysis.py
+  uv run python exp/analysis/synthesis_report.py
+  uv run python exp/analysis/scaling_analysis.py
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📍 LOCATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+All files in: exp/comparative_analysis_MATH500-Qwen2.5-3B/
+
+Source experiments:
+  1. exp/analysis_output-MATH500-Qwen2.5-3B-bon-difficulty/
+  2. exp/analysis_output-MATH500-Qwen2.5-3B-bon-difficulty-ref0.8/
+  3. exp/analysis_output-MATH500-Qwen2.5-3B-dvts-difficulty/
+  4. exp/analysis_output-MATH500-Qwen2.5-3B-dvts-difficulty-ref0.8/
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Generated: 2026-02-03
+Status: ✅ COMPLETE
+Total Size: 2.0 MB (reports + visualizations)
+Lines of Analysis: 1,100+ markdown
+
+================================================================================
