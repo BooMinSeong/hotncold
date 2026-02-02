@@ -19,7 +19,7 @@ from tqdm import tqdm
 from .difficulty import (
     DifficultyLevel,
     ProblemBaseline,
-    compute_problem_baselines_from_preds,
+    compute_problem_baselines_from_completions,
     stratify_by_absolute_difficulty,
 )
 from .metrics import analyze_single_dataset, aggregate_across_seeds
@@ -39,30 +39,31 @@ DEFAULT_DIFFICULTY_THRESHOLDS = {
 def compute_universal_difficulty_baselines(
     datasets_by_temp: dict[float, dict[int, Any]],
     reference_temp: float | None = None,
-    method: str = "maj",
-    n_samples: int | None = None,
     verbose: bool = True,
 ) -> dict[str, ProblemBaseline]:
-    """Compute difficulty baselines using a reference temperature.
+    """Compute difficulty baselines using completions from a reference temperature.
 
     This creates a temperature-independent difficulty metric by using
     a single reference temperature (typically the lowest) as the baseline.
     This allows us to identify problems that are inherently difficult
     (low accuracy at reference temp) vs easy (high accuracy at reference temp).
 
-    The baseline is computed using a single field: is_correct_{method}@{n_samples}
-    (default: is_correct_maj@{max_n} for BoN majority voting at maximum samples).
+    The baseline is computed using is_correct_preds field (list of booleans,
+    one per completion). For each seed, accuracy is computed as the fraction
+    of correct completions, then averaged across seeds. This provides much
+    finer-grained difficulty measurement than using majority vote results.
 
     Args:
         datasets_by_temp: Nested dict {temperature: {seed: Dataset}}
         reference_temp: Reference temperature to use for baseline.
                        If None, uses the lowest temperature.
-        method: Which method to use for baseline (default: "maj" for majority voting)
-        n_samples: Number of samples to use. If None, uses the maximum available.
         verbose: Print progress messages
 
     Returns:
         Dict mapping problem unique_id to ProblemBaseline
+
+    Raises:
+        ValueError: If datasets don't have is_correct_preds field
     """
     # Select reference temperature
     if reference_temp is None:
@@ -79,18 +80,16 @@ def compute_universal_difficulty_baselines(
         print("\nComputing difficulty baselines from reference temperature...")
         print(f"  Reference temperature: {reference_temp}")
         print(f"  Using {len(datasets_by_temp[reference_temp])} seeds")
-        print(f"  Baseline method: {method}")
+        print(f"  Baseline method: completions (is_correct_preds)")
 
     # Use only the reference temperature data
     # Format as {approach: {seed: Dataset}} for baseline computation
     reference_data = {f"T{reference_temp}": datasets_by_temp[reference_temp]}
 
-    # Compute baselines using specific field (is_correct_{method}@{n_samples})
-    baselines = compute_problem_baselines_from_preds(
+    # Compute baselines using completions (is_correct_preds field)
+    baselines = compute_problem_baselines_from_completions(
         reference_data,
         aggregate_across_approaches=True,  # Aggregate across seeds
-        method=method,
-        n_samples=n_samples,
         verbose=verbose,
     )
 
@@ -472,8 +471,6 @@ def generate_difficulty_temperature_report(
     difficulty_levels: dict[int, DifficultyLevel],
     output_path: str,
     reference_temp: float | None = None,
-    baseline_method: str = "maj",
-    baseline_n: int | None = None,
     verbose: bool = True,
 ) -> None:
     """Generate markdown report for temperature-difficulty analysis.
@@ -483,8 +480,6 @@ def generate_difficulty_temperature_report(
         difficulty_levels: Difficulty level definitions
         output_path: Output path for markdown file
         reference_temp: Reference temperature used for difficulty baseline
-        baseline_method: Method used for baseline (default: "maj")
-        baseline_n: Number of samples used for baseline (None = auto-detected max)
         verbose: Print progress messages
     """
     if verbose:
@@ -502,12 +497,12 @@ def generate_difficulty_temperature_report(
             "problems of varying difficulty.\n\n"
         )
         if reference_temp is not None:
-            baseline_field = f"`is_correct_{baseline_method}@{baseline_n if baseline_n else 'max'}`"
             f.write(
                 f"**Difficulty Baseline:** Problems are categorized based on their "
-                f"accuracy using {baseline_field} at the reference temperature **T={reference_temp}**. "
-                f"This allows us to identify which temperatures improve performance on problems that "
-                f"are inherently difficult (low accuracy at T={reference_temp}).\n\n"
+                f"accuracy using `is_correct_preds` (all completions) at the reference temperature **T={reference_temp}**. "
+                f"This provides fine-grained difficulty measurement by evaluating each completion individually, "
+                f"then averaging across seeds. This allows us to identify which temperatures improve performance "
+                f"on problems that are inherently difficult (low accuracy at T={reference_temp}).\n\n"
             )
 
         # Difficulty distribution

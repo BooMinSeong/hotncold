@@ -64,11 +64,19 @@ def preprocess_single_subset(
     # Prepare new columns
     new_columns = {f"is_correct_{field[5:]}": [] for field in pred_fields}
 
+    # Check if preds field exists (list of all predictions)
+    has_preds = "preds" in dataset.features
+    if has_preds:
+        new_columns["is_correct_preds"] = []
+        if verbose:
+            print(f"  Found 'preds' field - will evaluate all completions")
+
     # Evaluate each row
     if verbose:
         print(f"\n  Evaluating predictions...")
 
     for row in tqdm(dataset, desc=f"  Evaluating {subset_name}", disable=not verbose):
+        # Evaluate pred_* fields (aggregated predictions)
         for pred_field in pred_fields:
             try:
                 is_correct = evaluate_result(row, pred_field)
@@ -77,6 +85,24 @@ def preprocess_single_subset(
                 is_correct = False
 
             new_columns[f"is_correct_{pred_field[5:]}"].append(is_correct)
+
+        # Evaluate preds field (list of all predictions)
+        if has_preds:
+            preds_list = row["preds"]
+            is_correct_list = []
+
+            for pred in preds_list:
+                try:
+                    # Create temporary dict with answer and prediction
+                    temp_data = {"answer": row["answer"], "pred": pred}
+                    is_correct = evaluate_result(temp_data, key="pred")
+                except Exception:
+                    # If evaluation fails, mark as incorrect
+                    is_correct = False
+
+                is_correct_list.append(is_correct)
+
+            new_columns["is_correct_preds"].append(is_correct_list)
 
     # Add new columns to dataset
     if verbose:

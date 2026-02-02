@@ -209,6 +209,111 @@ def compute_accuracy_by_method(
     return aggregated
 
 
+def analyze_completions_accuracy(
+    dataset: Any,
+    dataset_name: str,
+    seed: int,
+    verbose: bool = True,
+) -> dict[str, float]:
+    """Analyze accuracy using all completions (not aggregated methods).
+
+    Computes overall accuracy across all predictions in is_correct_preds field.
+    This evaluates the model's base capability without method-based aggregation.
+
+    Args:
+        dataset: Preprocessed dataset with is_correct_preds field
+        dataset_name: Name for logging
+        seed: Seed number
+        verbose: Print progress
+
+    Returns:
+        Dict with:
+            - "mean_accuracy": Overall accuracy across all completions
+            - "num_completions": Total number of completions evaluated
+            - "num_problems": Number of problems
+            - "num_correct": Number of correct completions
+
+    Raises:
+        ValueError: If dataset doesn't have is_correct_preds field
+    """
+    if "train" in dataset:
+        dataset = dataset["train"]
+
+    if "is_correct_preds" not in dataset.features:
+        raise ValueError(
+            f"Dataset {dataset_name} (seed {seed}) is not preprocessed with is_correct_preds. "
+            f"Please run updated preprocessing first."
+        )
+
+    total_correct = 0
+    total_completions = 0
+
+    for problem in dataset:
+        is_correct_list = problem["is_correct_preds"]
+        total_correct += sum(is_correct_list)
+        total_completions += len(is_correct_list)
+
+    mean_accuracy = total_correct / total_completions if total_completions > 0 else 0.0
+
+    if verbose:
+        print(f"    {dataset_name} seed {seed}: {mean_accuracy:.3f} ({total_correct}/{total_completions})")
+
+    return {
+        "mean_accuracy": mean_accuracy,
+        "num_completions": total_completions,
+        "num_problems": len(dataset),
+        "num_correct": total_correct,
+    }
+
+
+def compute_completions_accuracy_by_temperature(
+    datasets_by_temp: dict[float, dict[int, Any]],
+    verbose: bool = True,
+) -> dict[float, dict[str, float]]:
+    """Compute completions-based accuracy across temperatures.
+
+    This evaluates model's base capability by looking at raw completion
+    accuracy, independent of aggregation methods (naive/weighted/maj).
+
+    Args:
+        datasets_by_temp: Nested dict {temperature: {seed: Dataset}}
+        verbose: Print progress messages
+
+    Returns:
+        Dict mapping temperature to aggregated stats:
+        {
+            temperature: {
+                "mean": float,
+                "std": float,
+                "values": list[float],
+                "seeds": list[int]
+            }
+        }
+    """
+    if verbose:
+        print("\nComputing completions-based accuracy by temperature...")
+
+    results = {}
+
+    for temp in sorted(datasets_by_temp.keys()):
+        if verbose:
+            print(f"  Temperature {temp}:")
+
+        seed_accuracies = {}
+        for seed, dataset in datasets_by_temp[temp].items():
+            result = analyze_completions_accuracy(
+                dataset,
+                f"T{temp}",
+                seed,
+                verbose=verbose
+            )
+            seed_accuracies[seed] = result["mean_accuracy"]
+
+        results[temp] = aggregate_across_seeds(seed_accuracies)
+
+    return results
+
+
 def compute_pass_at_k_aggregated(
     datasets: dict[int, Any],
     dataset_name: str,

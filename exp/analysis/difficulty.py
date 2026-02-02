@@ -274,6 +274,101 @@ def compute_problem_baselines_from_preds(
     return baselines
 
 
+def compute_problem_baselines_from_completions(
+    datasets: dict[str, dict[int, Any]],
+    aggregate_across_approaches: bool = True,
+    verbose: bool = True,
+) -> dict[str, ProblemBaseline]:
+    """Compute baseline difficulty using all completions (not just majority vote).
+
+    Uses preprocessed is_correct_preds field (list of booleans) to compute
+    per-seed accuracy as a float, then averages across seeds. This provides
+    much finer-grained difficulty measurement than using majority vote result.
+
+    Args:
+        datasets: Nested dict {approach: {seed: Dataset}}
+        aggregate_across_approaches: If True, average across all approaches
+        verbose: Print progress messages
+
+    Returns:
+        Dict mapping problem key to ProblemBaseline.
+        Key is unique_id if aggregating, or "{approach}:{unique_id}" otherwise.
+
+    Raises:
+        ValueError: If datasets don't have is_correct_preds field
+
+    Example:
+        >>> baselines = compute_problem_baselines_from_completions(datasets)
+        >>> for pid, baseline in baselines.items():
+        ...     print(f"{pid}: {baseline.mean_accuracy:.3f} ({baseline.num_evaluations} seeds)")
+    """
+    if verbose:
+        print("\n  Computing problem baselines from completions...")
+
+    # Collect all accuracies per problem
+    problem_accuracies = defaultdict(list)
+    problem_metadata = {}  # Store problem text and answer
+
+    for approach, seeds_data in datasets.items():
+        for seed, dataset in seeds_data.items():
+            if "train" in dataset:
+                dataset = dataset["train"]
+
+            # Check for is_correct_preds field
+            if "is_correct_preds" not in dataset.features:
+                raise ValueError(
+                    f"Dataset for {approach} seed {seed} does not have 'is_correct_preds'. "
+                    f"Please run preprocessing with updated code."
+                )
+
+            if verbose and seed == list(seeds_data.keys())[0]:  # Print once per approach
+                print(f"    Processing {approach}")
+
+            for problem in dataset:
+                unique_id = problem.get("unique_id", problem.get("problem", ""))
+                if not unique_id:
+                    continue
+
+                # Store metadata (only once per problem)
+                if unique_id not in problem_metadata:
+                    problem_metadata[unique_id] = {
+                        "problem_text": problem.get("problem", ""),
+                        "answer": problem["answer"],
+                    }
+
+                # Compute accuracy for this seed
+                is_correct_list = problem["is_correct_preds"]
+                if not is_correct_list:
+                    continue
+
+                seed_accuracy = sum(is_correct_list) / len(is_correct_list)
+
+                key = unique_id if aggregate_across_approaches else f"{approach}:{unique_id}"
+                problem_accuracies[key].append(seed_accuracy)
+
+    # Compute mean accuracy per problem
+    baselines = {}
+    for problem_key, accuracies in problem_accuracies.items():
+        unique_id = problem_key.split(":")[-1] if ":" in problem_key else problem_key
+        mean_acc = sum(accuracies) / len(accuracies) if accuracies else 0.0
+
+        baselines[problem_key] = ProblemBaseline(
+            unique_id=unique_id,
+            problem_text=problem_metadata.get(unique_id, {}).get("problem_text", ""),
+            answer=problem_metadata.get(unique_id, {}).get("answer", ""),
+            mean_accuracy=mean_acc,
+            num_evaluations=len(accuracies),  # Number of seeds
+        )
+
+    if verbose:
+        print(f"  Computed baselines for {len(baselines)} problems")
+        if problem_accuracies:
+            avg_seeds = sum(len(v) for v in problem_accuracies.values()) / len(problem_accuracies)
+            print(f"  Average seeds per problem: {avg_seeds:.1f}")
+
+    return baselines
+
+
 def stratify_by_difficulty(
     baselines: dict[str, ProblemBaseline],
     num_levels: int = 5,

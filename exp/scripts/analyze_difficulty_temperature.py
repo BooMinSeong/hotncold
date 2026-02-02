@@ -59,6 +59,7 @@ from analysis.difficulty_temperature import (
     generate_difficulty_temperature_report,
 )
 from analysis.difficulty import stratify_by_absolute_difficulty
+from analysis.metrics import compute_completions_accuracy_by_temperature
 
 
 def parse_args():
@@ -106,18 +107,6 @@ def parse_args():
         "--reference-temp",
         type=float,
         help="Reference temperature for difficulty baseline (default: lowest temperature)",
-    )
-    parser.add_argument(
-        "--baseline-method",
-        type=str,
-        default="maj",
-        choices=["naive", "weighted", "maj"],
-        help="Method to use for difficulty baseline (default: maj for majority voting)",
-    )
-    parser.add_argument(
-        "--baseline-n",
-        type=int,
-        help="Number of samples to use for baseline (default: maximum available)",
     )
 
     # Output options
@@ -321,8 +310,6 @@ def main():
         baselines = compute_universal_difficulty_baselines(
             datasets_by_temp,
             reference_temp=args.reference_temp,
-            method=args.baseline_method,
-            n_samples=args.baseline_n,
             verbose=args.verbose,
         )
     except Exception as e:
@@ -389,6 +376,21 @@ def main():
         traceback.print_exc()
         sys.exit(1)
 
+    # Compute completions-based accuracy (model base capability)
+    completions_results = None
+    try:
+        if args.verbose:
+            print("\nComputing completions-based model capability...")
+        completions_results = compute_completions_accuracy_by_temperature(
+            datasets_by_temp,
+            verbose=args.verbose,
+        )
+    except Exception as e:
+        print(f"Warning: Could not compute completions-based accuracy: {e}")
+        if args.verbose:
+            import traceback
+            traceback.print_exc()
+
     # Generate plots
     if not args.no_plots:
         try:
@@ -414,10 +416,32 @@ def main():
                 difficulty_levels,
                 report_path,
                 reference_temp=reference_temp_used,
-                baseline_method=args.baseline_method,
-                baseline_n=args.baseline_n,
                 verbose=args.verbose,
             )
+
+            # Append completions-based accuracy section to report
+            if completions_results:
+                try:
+                    with open(report_path, "a") as f:
+                        f.write("\n## Model Base Capability (Completions-Based)\n\n")
+                        f.write(
+                            "Overall accuracy across all completions, independent of aggregation methods. "
+                            "This evaluates the model's raw generation quality.\n\n"
+                        )
+                        f.write("| Temperature | Mean Accuracy | Std | Seeds |\n")
+                        f.write("|-------------|---------------|-----|-------|\n")
+                        for temp in sorted(completions_results.keys()):
+                            data = completions_results[temp]
+                            seeds_str = ", ".join(str(s) for s in data["seeds"])
+                            f.write(
+                                f"| T{temp} | {data['mean']:.3f} | {data['std']:.3f} | {seeds_str} |\n"
+                            )
+                        f.write("\n")
+                    if args.verbose:
+                        print(f"  Added completions-based evaluation to report")
+                except Exception as e:
+                    print(f"Warning: Could not add completions results to report: {e}")
+
         except Exception as e:
             print(f"Error generating report: {e}")
             import traceback
