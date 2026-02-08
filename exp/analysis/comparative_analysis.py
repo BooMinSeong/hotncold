@@ -76,18 +76,46 @@ def parse_report(report_path: Path) -> ExperimentMetrics:
                     count = int(parts[3])
                     level_counts[level_num] = count
 
-    # Parse optimal temperatures per level
+    # Parse optimal temperatures per level (using MAJORITY METHOD)
     optimal_temps = {}
     for level in range(1, 6):
-        # Look for "At 64 samples (naive method), **T0.X** performs best with Y.YYY accuracy" pattern
-        level_section_match = re.search(
-            rf'## Level {level}:.*?### Best Temperature.*?\*\*(T\d\.\d+)\*\*.*?with ([\d\.]+) accuracy',
-            content, re.DOTALL
-        )
-        if level_section_match:
-            temp = level_section_match.group(1)
-            acc = float(level_section_match.group(2))
-            optimal_temps[level] = (temp, acc)
+        # Find Level section
+        level_pattern = rf'## Level {level}:.*?(?=## Level \d+:|## Model Base Capability|$)'
+        level_match = re.search(level_pattern, content, re.DOTALL)
+
+        if not level_match:
+            continue
+
+        level_section = level_match.group(0)
+
+        # Find Maj Method table
+        maj_pattern = r'### Maj Method\s*\n\s*\| N \|(.*?)\|\s*\n\s*\|---.*?\n((?:\| \d+.*?\n)+)'
+        maj_match = re.search(maj_pattern, level_section, re.DOTALL)
+
+        if maj_match:
+            # Parse header to get temperatures
+            header = maj_match.group(1)
+            temps = [t.strip() for t in header.split('|') if t.strip()]
+
+            # Parse table rows to find N=64 accuracies
+            table_lines = maj_match.group(2).strip().split('\n')
+            n64_accs = {}
+
+            for line in table_lines:
+                parts = [p.strip() for p in line.split('|') if p.strip()]
+                if len(parts) >= len(temps) + 1 and parts[0] == '64':
+                    for i, temp in enumerate(temps):
+                        if i + 1 < len(parts):
+                            acc_str = parts[i + 1]
+                            if '±' in acc_str:
+                                acc = float(acc_str.split('±')[0].strip())
+                                n64_accs[temp] = acc
+                    break
+
+            # Find best temperature at N=64
+            if n64_accs:
+                best_temp = max(n64_accs.items(), key=lambda x: x[1])
+                optimal_temps[level] = (best_temp[0], best_temp[1])
 
     # Parse base model capability
     base_capability = {}

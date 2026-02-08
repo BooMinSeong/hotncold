@@ -14,6 +14,31 @@ import numpy as np
 import seaborn as sns
 
 
+# Best temperature per experiment (MAJORITY METHOD at N=64)
+BEST_TEMPS_MAJORITY = {
+    ('BoN', '0.1', 1): 'T0.1',
+    ('BoN', '0.1', 2): 'T0.1',
+    ('BoN', '0.1', 3): 'T0.8',
+    ('BoN', '0.1', 4): 'T0.8',
+    ('BoN', '0.1', 5): 'T0.8',
+    ('BoN', '0.8', 1): 'T0.2',
+    ('BoN', '0.8', 2): 'T0.4',
+    ('BoN', '0.8', 3): 'T0.8',
+    ('BoN', '0.8', 4): 'T0.8',
+    ('BoN', '0.8', 5): 'T0.4',
+    ('DVTS', '0.1', 1): 'T0.1',
+    ('DVTS', '0.1', 2): 'T0.1',
+    ('DVTS', '0.1', 3): 'T0.8',
+    ('DVTS', '0.1', 4): 'T0.8',
+    ('DVTS', '0.1', 5): 'T0.8',
+    ('DVTS', '0.8', 1): 'T0.4',
+    ('DVTS', '0.8', 2): 'T0.8',
+    ('DVTS', '0.8', 3): 'T0.8',
+    ('DVTS', '0.8', 4): 'T0.8',
+    ('DVTS', '0.8', 5): 'T0.4',
+}
+
+
 def parse_level_data(report_dir: Path, level: int) -> Dict[str, Dict[str, List[Tuple[int, float]]]]:
     """
     Parse accuracy data for a specific level across all temperatures and methods.
@@ -109,7 +134,7 @@ def get_experiment_name(report_dir: Path) -> Tuple[str, str]:
 
 
 def plot_scaling_curves_by_level(experiments: List[Path], output_dir: Path):
-    """Create scaling curves for each difficulty level comparing all experiments"""
+    """Create scaling curves for each difficulty level comparing all experiments (MAJORITY METHOD)"""
 
     levels = [1, 2, 3, 4, 5]
     level_names = {
@@ -148,28 +173,28 @@ def plot_scaling_curves_by_level(experiments: List[Path], output_dir: Path):
         'DVTS-ref0.8': 'D'
     }
 
-    # Best temperature per experiment (from earlier analysis)
-    best_temps = {
+    # Best temperature per experiment (MAJORITY METHOD at N=64)
+    BEST_TEMPS_MAJORITY = {
         ('BoN', '0.1', 1): 'T0.1',
-        ('BoN', '0.1', 2): 'T0.2',
-        ('BoN', '0.1', 3): 'T0.1',
-        ('BoN', '0.1', 4): 'T0.4',
-        ('BoN', '0.1', 5): 'T0.2',
-        ('BoN', '0.8', 1): 'T0.1',
-        ('BoN', '0.8', 2): 'T0.2',
-        ('BoN', '0.8', 3): 'T0.2',
-        ('BoN', '0.8', 4): 'T0.4',
-        ('BoN', '0.8', 5): 'T0.2',
+        ('BoN', '0.1', 2): 'T0.1',
+        ('BoN', '0.1', 3): 'T0.8',
+        ('BoN', '0.1', 4): 'T0.8',
+        ('BoN', '0.1', 5): 'T0.8',
+        ('BoN', '0.8', 1): 'T0.2',
+        ('BoN', '0.8', 2): 'T0.4',
+        ('BoN', '0.8', 3): 'T0.8',
+        ('BoN', '0.8', 4): 'T0.8',
+        ('BoN', '0.8', 5): 'T0.4',
         ('DVTS', '0.1', 1): 'T0.1',
-        ('DVTS', '0.1', 2): 'T0.8',
-        ('DVTS', '0.1', 3): 'T0.1',
-        ('DVTS', '0.1', 4): 'T0.4',
+        ('DVTS', '0.1', 2): 'T0.1',
+        ('DVTS', '0.1', 3): 'T0.8',
+        ('DVTS', '0.1', 4): 'T0.8',
         ('DVTS', '0.1', 5): 'T0.8',
-        ('DVTS', '0.8', 1): 'T0.1',
+        ('DVTS', '0.8', 1): 'T0.4',
         ('DVTS', '0.8', 2): 'T0.8',
-        ('DVTS', '0.8', 3): 'T0.2',
+        ('DVTS', '0.8', 3): 'T0.8',
         ('DVTS', '0.8', 4): 'T0.8',
-        ('DVTS', '0.8', 5): 'T0.2',
+        ('DVTS', '0.8', 5): 'T0.4',
     }
 
     for idx, level in enumerate(levels):
@@ -180,11 +205,11 @@ def plot_scaling_curves_by_level(experiments: List[Path], output_dir: Path):
                 continue
 
             algo, ref = exp_name.split('-ref')
-            best_temp = best_temps.get((algo, ref, level), 'T0.2')
+            best_temp = BEST_TEMPS_MAJORITY.get((algo, ref, level), 'T0.2')
 
-            # Get weighted method data at best temperature
-            if 'weighted' in level_data[level] and best_temp in level_data[level]['weighted']:
-                data_points = level_data[level]['weighted'][best_temp]
+            # Get MAJORITY method data at best temperature
+            if 'majority' in level_data[level] and best_temp in level_data[level]['majority']:
+                data_points = level_data[level]['majority'][best_temp]
                 if data_points:
                     ns, accs = zip(*sorted(data_points))
 
@@ -197,7 +222,7 @@ def plot_scaling_curves_by_level(experiments: List[Path], output_dir: Path):
                            alpha=0.85)
 
         ax.set_xlabel('Sample Budget (N)', fontsize=12, fontweight='bold')
-        ax.set_ylabel('Accuracy', fontsize=12, fontweight='bold')
+        ax.set_ylabel('Accuracy (Majority Vote)', fontsize=12, fontweight='bold')
         ax.set_title(level_names[level], fontsize=13, fontweight='bold')
         ax.set_xscale('log', base=2)
         ax.set_xticks([1, 2, 4, 8, 16, 32, 64])
@@ -251,10 +276,11 @@ def plot_algorithm_comparison_scaling(experiments: List[Path], output_dir: Path)
             continue
 
         algo = exp_name.split('-')[0]
-        best_temp = 'T0.2' if algo == 'BoN' else 'T0.1'
+        # Use majority method optimal temps for Level 3
+        best_temp = BEST_TEMPS_MAJORITY.get((algo, '0.1', 3), 'T0.2')
 
-        if 'weighted' in level_data and best_temp in level_data['weighted']:
-            data_points = level_data['weighted'][best_temp]
+        if 'majority' in level_data and best_temp in level_data['majority']:
+            data_points = level_data['majority'][best_temp]
             if data_points:
                 ns, accs = zip(*sorted(data_points))
 
@@ -267,8 +293,8 @@ def plot_algorithm_comparison_scaling(experiments: List[Path], output_dir: Path)
                         alpha=0.85)
 
     ax1.set_xlabel('Sample Budget (N)', fontsize=13, fontweight='bold')
-    ax1.set_ylabel('Accuracy (Level 3)', fontsize=13, fontweight='bold')
-    ax1.set_title('Scaling Comparison: ref0.1 Baseline', fontsize=14, fontweight='bold')
+    ax1.set_ylabel('Accuracy (Level 3, Majority)', fontsize=13, fontweight='bold')
+    ax1.set_title('Scaling Comparison: ref0.1 Baseline (Majority Vote)', fontsize=14, fontweight='bold')
     ax1.set_xscale('log', base=2)
     ax1.set_xticks([1, 2, 4, 8, 16, 32, 64])
     ax1.set_xticklabels(['1', '2', '4', '8', '16', '32', '64'])
@@ -283,10 +309,11 @@ def plot_algorithm_comparison_scaling(experiments: List[Path], output_dir: Path)
             continue
 
         algo = exp_name.split('-')[0]
-        best_temp = 'T0.2'
+        # Use majority method optimal temps for Level 3
+        best_temp = BEST_TEMPS_MAJORITY.get((algo, '0.8', 3), 'T0.2')
 
-        if 'weighted' in level_data and best_temp in level_data['weighted']:
-            data_points = level_data['weighted'][best_temp]
+        if 'majority' in level_data and best_temp in level_data['majority']:
+            data_points = level_data['majority'][best_temp]
             if data_points:
                 ns, accs = zip(*sorted(data_points))
 
@@ -299,8 +326,8 @@ def plot_algorithm_comparison_scaling(experiments: List[Path], output_dir: Path)
                         alpha=0.85)
 
     ax2.set_xlabel('Sample Budget (N)', fontsize=13, fontweight='bold')
-    ax2.set_ylabel('Accuracy (Level 3)', fontsize=13, fontweight='bold')
-    ax2.set_title('Scaling Comparison: ref0.8 Baseline', fontsize=14, fontweight='bold')
+    ax2.set_ylabel('Accuracy (Level 3, Majority)', fontsize=13, fontweight='bold')
+    ax2.set_title('Scaling Comparison: ref0.8 Baseline (Majority Vote)', fontsize=14, fontweight='bold')
     ax2.set_xscale('log', base=2)
     ax2.set_xticks([1, 2, 4, 8, 16, 32, 64])
     ax2.set_xticklabels(['1', '2', '4', '8', '16', '32', '64'])
@@ -337,7 +364,7 @@ def analyze_compute_efficiency(experiments: List[Path], output_dir: Path):
 
         level_data = parse_level_data(exp_dir, 3)
 
-        if 'weighted' not in level_data:
+        if 'majority' not in level_data:
             lines.append("No data available.")
             lines.append("")
             continue
@@ -347,10 +374,10 @@ def analyze_compute_efficiency(experiments: List[Path], output_dir: Path):
 
         # Check common temperatures
         for temp in ['T0.1', 'T0.2', 'T0.4', 'T0.8']:
-            if temp not in level_data['weighted']:
+            if temp not in level_data['majority']:
                 continue
 
-            data_points = sorted(level_data['weighted'][temp])
+            data_points = sorted(level_data['majority'][temp])
 
             for i in range(len(data_points) - 1):
                 n1, acc1 = data_points[i]

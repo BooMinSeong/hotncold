@@ -38,63 +38,60 @@ Distribution format: Level1/Level2/Level3/Level4/Level5 problem counts
 
 | Level | Optimal Temp | Best Accuracy |
 |-------|--------------|---------------|
-| Level 1 | T0.1 | 0.997 |
-| Level 2 | T0.2 | 0.926 |
-| Level 3 | T0.1 | 0.870 |
-| Level 4 | T0.4 | 0.758 |
-| Level 5 | T0.2 | 0.536 |
+| Level 1 | T0.1 | 1.000 |
+| Level 2 | T0.1 | 1.000 |
+| Level 3 | T0.8 | 0.884 |
+| Level 4 | T0.8 | 0.717 |
+| Level 5 | T0.8 | 0.451 |
 
 ### BoN-ref0.8
 
 | Level | Optimal Temp | Best Accuracy |
 |-------|--------------|---------------|
-| Level 1 | T0.1 | 0.998 |
-| Level 2 | T0.2 | 0.937 |
-| Level 3 | T0.2 | 0.893 |
-| Level 4 | T0.4 | 0.800 |
-| Level 5 | T0.2 | 0.527 |
+| Level 1 | T0.2 | 1.000 |
+| Level 2 | T0.4 | 1.000 |
+| Level 3 | T0.8 | 0.952 |
+| Level 4 | T0.8 | 0.753 |
+| Level 5 | T0.4 | 0.423 |
 
 ### DVTS-ref0.1
 
 | Level | Optimal Temp | Best Accuracy |
 |-------|--------------|---------------|
-| Level 1 | T0.1 | 0.993 |
-| Level 2 | T0.8 | 0.917 |
-| Level 3 | T0.1 | 0.841 |
-| Level 4 | T0.4 | 0.841 |
-| Level 5 | T0.8 | 0.537 |
+| Level 1 | T0.1 | 1.000 |
+| Level 2 | T0.1 | 1.000 |
+| Level 3 | T0.8 | 0.825 |
+| Level 4 | T0.8 | 0.714 |
+| Level 5 | T0.8 | 0.468 |
 
 ### DVTS-ref0.8
 
 | Level | Optimal Temp | Best Accuracy |
 |-------|--------------|---------------|
-| Level 1 | T0.1 | 0.995 |
-| Level 2 | T0.8 | 0.944 |
-| Level 3 | T0.2 | 0.880 |
-| Level 4 | T0.8 | 0.598 |
-| Level 5 | T0.2 | 0.500 |
+| Level 1 | T0.4 | 1.000 |
+| Level 2 | T0.8 | 1.000 |
+| Level 3 | T0.8 | 0.907 |
+| Level 4 | T0.8 | 0.506 |
+| Level 5 | T0.4 | 0.440 |
 
 ### Temperature Preference Patterns
 
 **BoN-ref0.1**:
-- T0.1: Levels 1, 3
-- T0.2: Levels 2, 5
-- T0.4: Levels 4
+- T0.1: Levels 1, 2
+- T0.8: Levels 3, 4, 5
 
 **BoN-ref0.8**:
-- T0.1: Levels 1
-- T0.2: Levels 2, 3, 5
-- T0.4: Levels 4
+- T0.2: Levels 1
+- T0.4: Levels 2, 5
+- T0.8: Levels 3, 4
 
 **DVTS-ref0.1**:
-- T0.1: Levels 1, 3
-- T0.4: Levels 4
-- T0.8: Levels 2, 5
+- T0.1: Levels 1, 2
+- T0.8: Levels 3, 4, 5
 
 **DVTS-ref0.8**:
-- T0.1: Levels 1
-- T0.2: Levels 3, 5
-- T0.8: Levels 2, 4
+- T0.4: Levels 1, 5
+- T0.8: Levels 2, 3, 4
 
 ## Phase 3: Base Model Capability
 
@@ -129,23 +126,23 @@ Distribution format: Level1/Level2/Level3/Level4/Level5 problem counts
 
 | Level | Optimal @ ref0.1 | Optimal @ ref0.8 | Agreement |
 |-------|------------------|------------------|-----------|
-| Level 1 | T0.1 (0.997) | T0.1 (0.998) | ✓ |
-| Level 2 | T0.2 (0.926) | T0.2 (0.937) | ✓ |
-| Level 3 | T0.1 (0.870) | T0.2 (0.893) | ✗ |
-| Level 4 | T0.4 (0.758) | T0.4 (0.800) | ✓ |
-| Level 5 | T0.2 (0.536) | T0.2 (0.527) | ✓ |
+| Level 1 | T0.1 (1.000) | T0.2 (1.000) | ✗ |
+| Level 2 | T0.1 (1.000) | T0.4 (1.000) | ✗ |
+| Level 3 | T0.8 (0.884) | T0.8 (0.952) | ✓ |
+| Level 4 | T0.8 (0.717) | T0.8 (0.753) | ✓ |
+| Level 5 | T0.8 (0.451) | T0.4 (0.423) | ✗ |
 
-**BoN Consistency**: 4/5 levels (80%) have same optimal temperature regardless of reference
+**BoN Consistency**: 2/5 levels (40%) have same optimal temperature regardless of reference
 
 #### DVTS: Sensitive to Reference Temperature
 
 | Level | Optimal @ ref0.1 | Optimal @ ref0.8 | Agreement |
 |-------|------------------|------------------|-----------|
-| Level 1 | T0.1 (0.993) | T0.1 (0.995) | ✓ |
-| Level 2 | T0.8 (0.917) | T0.8 (0.944) | ✓ |
-| Level 3 | T0.1 (0.841) | T0.2 (0.880) | ✗ |
-| Level 4 | T0.4 (0.841) | T0.8 (0.598) | ✗ |
-| Level 5 | T0.8 (0.537) | T0.2 (0.500) | ✗ |
+| Level 1 | T0.1 (1.000) | T0.4 (1.000) | ✗ |
+| Level 2 | T0.1 (1.000) | T0.8 (1.000) | ✗ |
+| Level 3 | T0.8 (0.825) | T0.8 (0.907) | ✓ |
+| Level 4 | T0.8 (0.714) | T0.8 (0.506) | ✓ |
+| Level 5 | T0.8 (0.468) | T0.4 (0.440) | ✗ |
 
 **DVTS Consistency**: 2/5 levels (40%) have same optimal temperature regardless of reference
 

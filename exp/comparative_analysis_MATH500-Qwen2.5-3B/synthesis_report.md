@@ -251,4 +251,4 @@ This comprehensive 2×2 factorial analysis reveals fundamental differences betwe
   - Level 4: 0.2-0.4 (hard)
   - Level 5: 0.0-0.2 (very hard)
 
-**Analysis generated**: 2026-02-03 04:42:59
+**Analysis generated**: 2026-02-03 05:30:45
