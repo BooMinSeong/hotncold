@@ -22,16 +22,18 @@ from tqdm import tqdm
 from vllm import LLM, SamplingParams
 
 from sal.config import Config
-from sal.models.reward_models import PRM
 from sal.utils.score import aggregate_scores
 from sal.utils.temperature import get_temperature_assignment
+
+from sal.search.prm_utils import flatten_completions, unflatten_scores
+from prm_toolkit import PrmServer
 
 from .utils import Beam, build_conv
 
 logger = logging.getLogger()
 
 
-def _dvts(batch_of_prompts: list[str], config: Config, llm: LLM, prm: PRM):
+def _dvts(batch_of_prompts: list[str], config: Config, llm: LLM, prm: PrmServer):
     sampling_params = SamplingParams(
         temperature=config.temperature,
         max_tokens=2048,
@@ -131,7 +133,7 @@ def _dvts(batch_of_prompts: list[str], config: Config, llm: LLM, prm: PRM):
                 beam.stop_reasons.append(output.outputs[0].finish_reason)
                 output_idx += 1
 
-                # Prepare for PRM scoring
+                # Prepare for PrmServer scoring
                 prompts_prm.append(beam.prompt)
                 completions_prm.append([beam.current_text + beam.next_texts[path_idx]])
 
@@ -141,8 +143,13 @@ def _dvts(batch_of_prompts: list[str], config: Config, llm: LLM, prm: PRM):
                     f"beam {beam.index} has {len(beam.next_texts)} completions"
                 )
 
+        # Score all diverse paths with PrmServer
+        # all_scores = prm.score(prompts_prm, completions_prm)
+
         # Score all diverse paths with PRM
-        all_scores = prm.score(prompts_prm, completions_prm)
+        flat_prompts, flat_responses, structure = flatten_completions(prompts_prm, completions_prm)
+        flat_scores = prm.score_batch(flat_prompts, flat_responses)
+        all_scores = unflatten_scores(flat_scores, structure)
 
         # Assign scores and select best path for each beam
         score_idx = 0
@@ -202,7 +209,7 @@ def _dvts(batch_of_prompts: list[str], config: Config, llm: LLM, prm: PRM):
     return output
 
 
-def dvts(examples, config: Config, llm: LLM, prm: PRM):
+def dvts(examples, config: Config, llm: LLM, prm: PrmServer):
     problems = examples["problem"]
     beam_results = _dvts(problems, config, llm, prm)
 

@@ -17,11 +17,12 @@ import numpy as np
 from vllm import LLM, SamplingParams
 
 from sal.config import Config
-from sal.models.reward_models import PRM
 from sal.utils.score import aggregate_scores
+from prm_toolkit import PrmServer
+from sal.search.prm_utils import flatten_completions, unflatten_scores
 
 
-def best_of_n(x, config: Config, llm: LLM, prm: PRM):
+def best_of_n(x, config: Config, llm: LLM, prm: PrmServer):
     from sal.utils.temperature import get_temperature_assignment
 
     tokenizer = llm.get_tokenizer()
@@ -93,7 +94,10 @@ def best_of_n(x, config: Config, llm: LLM, prm: PRM):
         if len(c) != config.n:
             raise ValueError(f"Generated {len(c)} completions instead of {config.n}")
 
-    scores = prm.score(x["problem"], completions)
+    # scores = prm.score(x["problem"], completions)
+    flat_prompts, flat_responses, structure = flatten_completions(x["problem"], completions)
+    flat_scores = prm.score_batch(flat_prompts, flat_responses)
+    scores = unflatten_scores(flat_scores, structure)
     agg_scores = [
         [aggregate_scores(s, config.agg_strategy) for s in score] for score in scores
     ]

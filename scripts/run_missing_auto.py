@@ -44,10 +44,10 @@ class JobConfig:
 class AutoRunConfig:
     """Overall automation configuration."""
     model_name: str = "Qwen2.5-3B-Instruct"
-    dataset_name: str = "MATH-500"
+    dataset_name: str = "ENSEONG/math-private" # "MATH-500"
     hub_org: str = "ENSEONG"
-    total_samples: int = 500
-    chunk_size: int = 50  # Split missing ranges into chunks of this size
+    total_samples: int = 5000
+    chunk_size: int = 500  # Split missing ranges into chunks of this size
 
     seeds: List[int] = field(default_factory=lambda: [0, 42, 64])
     temperatures: List[float] = field(default_factory=lambda: [0.1, 0.2, 0.4, 0.8])

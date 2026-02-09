@@ -26,9 +26,10 @@ class Config:
     approach: Literal["best_of_n", "beam_search", "dvts"] = "best_of_n"
     model_path: str = "Qwen/Qwen2.5-1.5B-Instruct"
     gpu_memory_utilization: float = (
-        0.5  # vllm is allocated 0.5 of GPU memory, the PRM uses the rest
+        0.45  # vllm is allocated 0.5 of GPU memory, the PRM uses the rest
     )
     prm_path: str = "Skywork/Skywork-o1-Open-PRM-Qwen-2.5-1.5B"
+    prm_base_url: str = None
     # Output Related Options
     output_dir: str = None
     num_proc: int = None
@@ -59,6 +60,7 @@ class Config:
     search_batch_size: int = 4
     seed: int = 42
     max_tokens: int = 2048
+    max_model_len: int = 4096
     agg_strategy: str = "last"  # Options: "last", "min", "prod"
 
     # DVTS / Beam Search options

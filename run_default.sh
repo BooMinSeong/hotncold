@@ -1,12 +1,12 @@
 #!/bin/bash
 
 SEEDS=(0 42 64)
-SEARCH_METHODS=("best_of_n.yaml" "beam_search.yaml" "dvts.yaml")
-METHOD_NAMES=("bon" "beam_search" "dvts")
+SEARCH_METHODS=("best_of_n.yaml" "dvts.yaml") # "beam_search.yaml" 
+METHOD_NAMES=("bon" "dvts") # "beam_search" 
 TEMPERATURE=0.4
 # DATASET_NAME="HuggingFaceH4/MATH-500" # math-ai/aime25 "HuggingFaceH4/MATH-500"
-DATASET_NAME="math-ai/aime25" # math-ai/aime25 "HuggingFaceH4/MATH-500"
-MODEL_NAME="Llama-3.2-1B-Instruct" # meta-llama/Llama-3.2-3B-Instruct # Qwen2.5-3B-Instruct
+DATASET_NAME="ENSEONG/math-private" # math-ai/aime25 "HuggingFaceH4/MATH-500" "ENSEONG/math-private"
+MODEL_NAME="Qwen2.5-3B-Instruct" # meta-llama/Llama-3.2-3B-Instruct # Qwen2.5-3B-Instruct
 
 # 각 search method와 dataset name을 순회
 for i in "${!SEARCH_METHODS[@]}"; do
@@ -18,7 +18,7 @@ for i in "${!SEARCH_METHODS[@]}"; do
         echo "Running: Method=$METHOD, Dataset=$DATASET_NAME, Seed=$SEED, Temp=$TEMPERATURE"
         sbatch recipes/launch_array_default.slurm \
             recipes/$MODEL_NAME/$METHOD \
-            --hub_dataset_id=ENSEONG/default-${DATASET_NAME##*/}-$MODEL_NAME-$METHOD_NAME \
+            --hub_dataset_id=ENSEONG/full-${DATASET_NAME##*/}-$MODEL_NAME-$METHOD_NAME \
             --seed=$SEED \
             --temperature=$TEMPERATURE \
 	    --dataset_name=$DATASET_NAME

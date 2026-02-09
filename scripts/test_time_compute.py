@@ -19,11 +19,12 @@ import torch
 from vllm import LLM
 
 from sal.config import Config
-from sal.models.reward_models import load_prm
 from sal.search import beam_search, best_of_n, dvts
 from sal.utils.data import get_dataset, save_dataset
 from sal.utils.parser import H4ArgumentParser
 from sal.utils.score import score, score_pass_at_k
+
+from prm_toolkit import PrmConfig, PrmServer, load_prm_server
 
 logging.basicConfig(level=logging.INFO)
 
@@ -49,10 +50,20 @@ def main():
         model=config.model_path,
         gpu_memory_utilization=config.gpu_memory_utilization,
         enable_prefix_caching=True,
+        max_model_len=config.max_model_len,
         seed=config.seed,
         tensor_parallel_size=num_gpus,
     )
-    prm = load_prm(config)
+
+    prm_config = PrmConfig(
+        prm_path=config.prm_path,
+        base_url=config.prm_base_url,
+        max_tokens=config.max_model_len,
+        use_local_mode=True,
+        gpu_memory_utilization=0.9-config.gpu_memory_utilization,
+        )
+
+    prm = load_prm_server(prm_config)
 
     dataset = get_dataset(config)
     dataset = dataset.map(
