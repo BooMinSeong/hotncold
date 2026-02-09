@@ -4,8 +4,8 @@ model_path: Qwen/Qwen2.5-3B-Instruct
 custom_chat_template: null
 approach: best_of_n
 n: 64
-search_batch_size: 4
-prm_batch_size: 1
+search_batch_size: 25
+prm_batch_size: 16
 sort_completed: true
 filter_duplicates: true
 seed: 42 

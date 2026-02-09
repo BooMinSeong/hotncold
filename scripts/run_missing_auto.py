@@ -24,14 +24,15 @@ from typing import Dict, List, Optional
 
 # Add project root to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from exp.ds_chehck import check_dataset
+from sal.utils.ds_check import check_dataset
 
 
 @dataclass
 class JobConfig:
     """Configuration for a single missing range job."""
-    method: str          # "bon", "beam_search", "dvts"
-    method_yaml: str     # "best_of_n.yaml", etc.
+
+    method: str  # "bon", "beam_search", "dvts"
+    method_yaml: str  # "best_of_n.yaml", etc.
     seed: int
     temperature: float
     dataset_start: int
@@ -43,19 +44,22 @@ class JobConfig:
 @dataclass
 class AutoRunConfig:
     """Overall automation configuration."""
+
     model_name: str = "Qwen2.5-3B-Instruct"
-    dataset_name: str = "ENSEONG/math-private" # "MATH-500"
+    dataset_name: str = "math-private"  # "MATH-500"
     hub_org: str = "ENSEONG"
     total_samples: int = 5000
     chunk_size: int = 500  # Split missing ranges into chunks of this size
 
     seeds: List[int] = field(default_factory=lambda: [0, 42, 64])
     temperatures: List[float] = field(default_factory=lambda: [0.1, 0.2, 0.4, 0.8])
-    methods: Dict[str, str] = field(default_factory=lambda: {
-        "bon": "best_of_n.yaml",
-        "beam_search": "beam_search.yaml",
-        "dvts": "dvts.yaml"
-    })
+    methods: Dict[str, str] = field(
+        default_factory=lambda: {
+            "bon": "best_of_n.yaml",
+            "beam_search": "beam_search.yaml",
+            "dvts": "dvts.yaml",
+        }
+    )
 
 
 class MissingJobFinder:
@@ -66,7 +70,8 @@ class MissingJobFinder:
 
     def build_dataset_name(self, method: str) -> str:
         """Construct HuggingFace dataset repo name."""
-        return f"{self.config.hub_org}/default-{self.config.dataset_name}-{self.config.model_name}-{method}"
+        # return f"{self.config.hub_org}/default-{self.config.dataset_name}-{self.config.model_name}-{method}"
+        return f"{self.config.hub_org}/full-{self.config.dataset_name}-{self.config.model_name}-{method}"
 
     def split_range(self, start: int, end: int) -> List[tuple]:
         """Split a range into chunks of chunk_size.
@@ -86,7 +91,7 @@ class MissingJobFinder:
         self,
         method_filter: Optional[str] = None,
         seed_filter: Optional[int] = None,
-        temp_filter: Optional[float] = None
+        temp_filter: Optional[float] = None,
     ) -> List[JobConfig]:
         """Scan all combinations and return list of jobs for missing ranges."""
         jobs = []
@@ -108,9 +113,7 @@ class MissingJobFinder:
                     # Check this specific combination
                     filters = [f"seed-{seed}", f"T-{temp}"]
                     result = check_dataset(
-                        dataset_repo,
-                        filters=filters,
-                        total=self.config.total_samples
+                        dataset_repo, filters=filters, total=self.config.total_samples
                     )
 
                     # Skip if NOT_FOUND (dataset doesn't exist)
@@ -121,16 +124,18 @@ class MissingJobFinder:
                     # Create jobs for each missing range, split into chunks
                     for start, end in result.missing_ranges:
                         for chunk_start, chunk_end in self.split_range(start, end):
-                            jobs.append(JobConfig(
-                                method=method,
-                                method_yaml=method_yaml,
-                                seed=seed,
-                                temperature=temp,
-                                dataset_start=chunk_start,
-                                dataset_end=chunk_end,
-                                hub_dataset_id=dataset_repo,
-                                model_name=self.config.model_name
-                            ))
+                            jobs.append(
+                                JobConfig(
+                                    method=method,
+                                    method_yaml=method_yaml,
+                                    seed=seed,
+                                    temperature=temp,
+                                    dataset_start=chunk_start,
+                                    dataset_end=chunk_end,
+                                    hub_dataset_id=dataset_repo,
+                                    model_name=self.config.model_name,
+                                )
+                            )
 
         return jobs
 
@@ -145,17 +150,20 @@ class JobSubmitter:
     def submit(self, job: JobConfig) -> bool:
         """Submit a single job. Returns True if submitted."""
         cmd = [
-            "sbatch", "recipes/launch_single_default.slurm",
+            "sbatch",
+            "recipes/launch_single_default.slurm",
             f"recipes/{job.model_name}/{job.method_yaml}",
             f"--hub_dataset_id={job.hub_dataset_id}",
             f"--dataset_start={job.dataset_start}",
             f"--dataset_end={job.dataset_end}",
             f"--seed={job.seed}",
-            f"--temperature={job.temperature}"
+            f"--temperature={job.temperature}",
         ]
 
-        print(f"  [{job.method}] seed={job.seed} T={job.temperature} "
-              f"range=[{job.dataset_start},{job.dataset_end})")
+        print(
+            f"  [{job.method}] seed={job.seed} T={job.temperature} "
+            f"range=[{job.dataset_start},{job.dataset_end})"
+        )
 
         if self.dry_run:
             print(f"    DRY-RUN: {' '.join(cmd)}")
@@ -163,7 +171,7 @@ class JobSubmitter:
 
         if self.interactive:
             response = input("    Submit? [y/N]: ").strip().lower()
-            if response != 'y':
+            if response != "y":
                 print("    Skipped.")
                 return False
 
@@ -178,6 +186,7 @@ class JobSubmitter:
 
 def main():
     import argparse
+
     parser = argparse.ArgumentParser(
         description="Auto-detect and submit missing dataset jobs",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -195,36 +204,37 @@ Examples:
   # Filter by method/seed/temperature
   python scripts/run_missing_auto.py --submit --method bon --seed 42
   python scripts/run_missing_auto.py --submit --temperature 0.8
-        """
+        """,
     )
-    parser.add_argument("--submit", action="store_true",
-                        help="Actually submit jobs (default: dry-run)")
-    parser.add_argument("--interactive", "-i", action="store_true",
-                        help="Prompt before each submission")
-    parser.add_argument("--method", choices=["bon", "beam_search", "dvts"],
-                        help="Filter by method")
+    parser.add_argument(
+        "--submit", action="store_true", help="Actually submit jobs (default: dry-run)"
+    )
+    parser.add_argument(
+        "--interactive", "-i", action="store_true", help="Prompt before each submission"
+    )
+    parser.add_argument(
+        "--method", choices=["bon", "beam_search", "dvts"], help="Filter by method"
+    )
     parser.add_argument("--seed", type=int, help="Filter by seed")
     parser.add_argument("--temperature", type=float, help="Filter by temperature")
-    parser.add_argument("--model", default="Qwen2.5-3B-Instruct",
-                        help="Model name (default: Qwen2.5-3B-Instruct)")
+    parser.add_argument(
+        "--model",
+        default="Qwen2.5-3B-Instruct",
+        help="Model name (default: Qwen2.5-3B-Instruct)",
+    )
 
     args = parser.parse_args()
 
     # Configure
     config = AutoRunConfig(model_name=args.model)
     finder = MissingJobFinder(config)
-    submitter = JobSubmitter(
-        dry_run=not args.submit,
-        interactive=args.interactive
-    )
+    submitter = JobSubmitter(dry_run=not args.submit, interactive=args.interactive)
 
     # Find missing
     print("Scanning for missing dataset ranges...")
     print()
     jobs = finder.find_all_missing(
-        method_filter=args.method,
-        seed_filter=args.seed,
-        temp_filter=args.temperature
+        method_filter=args.method, seed_filter=args.seed, temp_filter=args.temperature
     )
 
     if not jobs:
@@ -242,19 +252,21 @@ Examples:
     for method, method_jobs in by_method.items():
         print(f"\n{method.upper()}:")
         for job in method_jobs:
-            print(f"  seed={job.seed} T={job.temperature}: "
-                  f"[{job.dataset_start},{job.dataset_end})")
+            print(
+                f"  seed={job.seed} T={job.temperature}: "
+                f"[{job.dataset_start},{job.dataset_end})"
+            )
 
     # Submit
     if args.submit or args.interactive:
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print("Submitting jobs..." if args.submit else "Interactive submission mode:")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
         submitted = sum(1 for job in jobs if submitter.submit(job))
         print(f"\nSubmitted {submitted}/{len(jobs)} jobs")
     else:
-        print(f"\nDry-run mode. Use --submit to actually submit jobs.")
+        print("\nDry-run mode. Use --submit to actually submit jobs.")
 
     return 0
 
