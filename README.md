@@ -11,88 +11,161 @@
 
 Recipes to enhance LLM capabilities by scaling inference-time compute. Name inspired by Rich Sutton's [Bitter Lesson](https://www.cs.utexas.edu/~eunsol/courses/data/bitter_lesson.pdf):
 
-> One thing that should be learned from the bitter lesson is the great power of general purpose methods, of methods that continue to scale with increased computation even as the available computation becomes very great. The two methods that seem to scale arbitrarily in this way are _**search**_ and _**learning**_.
+> The two methods that seem to scale arbitrarily in this way are _**search**_ and _**learning**_.
 
 ## What is this?
 
-Over the last few years, the scaling of _**train-time compute**_ has dominated the progress of LLMs. Although this paradigm has proven to be remarkably effective, the resources needed to pretrain ever larger models are becoming prohibitively expensive, with billion-dollar clusters already on the horizon. This trend has sparked significant interest in a complementary approach: _**test-time compute scaling.**_ Rather than relying on ever-larger pretraining budgets, test-time methods use dynamic inference strategies that allow models to “think longer” on harder problems. A prominent example is OpenAI’s o1 model, which shows consistent improvement on difficult math and coding problems as one increases the amount of test-time compute.
+Test-time compute scaling lets models "think longer" on harder problems without increasing pretraining cost. This repo implements search algorithms guided by Process Reward Models (PRMs) to solve complex math problems, extending the [original HuggingFace work](https://huggingface.co/spaces/HuggingFaceH4/blogpost-scaling-test-time-compute) with multi-temperature sampling and large-scale experiment automation.
 
-Although we don't know how o1 was trained, Search and Learn aims to fill that gap by providing the community with a series of recipes that enable open models to solve complex problems if you give them enough “time to think”. 
+## Search Algorithms
 
-## News 🗞️
+Three algorithms are supported, all driven by YAML configs in [`recipes/`](./recipes/):
 
-* **December 16, 2024**: Initial release with code to replicate the test-time compute scaling results of our [blog post](https://huggingface.co/spaces/HuggingFaceH4/blogpost-scaling-test-time-compute).
+| Algorithm | Key idea |
+| :--- | :--- |
+| **Best-of-N** | Sample N completions, select the one with the highest PRM score |
+| **Beam Search** | Stepwise tree expansion guided by PRM scores at each step |
+| **DVTS** | Diverse Verifier Tree Search — balances exploration diversity with PRM verification |
 
-## How to navigate this project 🧭
+Best-of-N and DVTS only need a single run at `n=256` (completions can be subsampled). Beam search requires a separate run for each value of `n`.
 
-This project is simple by design and mostly consists of:
+## Supported Models & PRMs
 
-* [`scripts`](./scripts/) to scale test-time compute for open models. 
-* [`recipes`](./recipes/) to apply different search algorithms at test-time. Three algorithms are currently supported: Best-of-N, beam search, and Diverse Verifier Tree Search (DVTS). Each recipe takes the form of a YAML file which contains all the parameters associated with a single inference run. 
+**Generator models** (recipe configs provided):
 
-To get started, we recommend the following:
+| Model | Recipes |
+| :--- | :--- |
+| `Qwen/Qwen2.5-3B-Instruct` | best_of_n, beam_search, dvts |
+| `Qwen/Qwen2.5-1.5B-Instruct` | best_of_n, beam_search, dvts |
+| `meta-llama/Llama-3.2-3B-Instruct` | best_of_n, beam_search, dvts |
+| `meta-llama/Llama-3.2-1B-Instruct` | best_of_n, beam_search, dvts |
+| `nvidia/AceMath-7B-Instruct` | best_of_n, beam_search, dvts |
 
-1. Follow the [installation instructions](#installation-instructions) to set up your environment etc.
-2. Replicate our test-time compute results by following the [recipe instructions](./recipes/README.md).
+Any model with a compatible chat template can be used via `--model_path`.
 
-## Contents
+**Process Reward Models:**
 
-The initial release of Search and Learn will focus on the following techniques:
+- `RLHFlow/Llama3.1-8B-PRM-Deepseek-Data` (default)
+- `peiyi9979/math-shepherd-mistral-7b-prm`
+- `Skywork/Skywork-o1-Open-PRM-Qwen-2.5-1.5B`
+- `Skywork/Skywork-o1-Open-PRM-Qwen-2.5-7B`
+- Custom PRMs trained with TRL (see [`recipes/training/`](recipes/training/))
 
-* **Search against verifiers:** guide LLMs to search for solutions to "verifiable problems" (math, code) by using a stepwise or process reward model to score each step. Includes techniques like Best-of-N sampling and tree search.
-* **Training process reward models:** train reward models to provide a sequence of scores, one for each step of the reasoning process. This ability to provide fine-grained feedback makes PRMs a natural fit for search methods with LLMs.
-
-
-# Installation instructions
-
-To run the code in this project, first, create a Python virtual environment using e.g. Conda:
+## Installation
 
 ```shell
 conda create -n sal python=3.11 && conda activate sal
-```
-
-```shell
 pip install -e '.[dev]'
-```
-
-Next, log into your Hugging Face account as follows:
-
-```shell
 huggingface-cli login
 ```
 
-Finally, install Git LFS so that you can push models to the Hugging Face Hub:
+## Quick Start
+
+Run a search algorithm using a recipe config:
 
 ```shell
-sudo apt-get install git-lfs
+export CONFIG=recipes/Qwen2.5-1.5B-Instruct/best_of_n.yaml
+uv run python scripts/test_time_compute.py $CONFIG
 ```
 
-You can now check out the `scripts` and `recipes` directories for instructions on how to scale test-time compute for open models!
+By default this runs Best-of-N with `n=4` over the first 10 problems of [MATH-500](https://huggingface.co/datasets/HuggingFaceH4/MATH-500) and saves results to `data/`. To push results to the Hub as a dataset branch:
 
-## Project structure
-
-```
-├── LICENSE
-├── Makefile                    <- Makefile with commands like `make style`
-├── README.md                   <- The top-level README for developers using this project
-├── recipes                     <- Recipe configs, accelerate configs, slurm scripts
-├── scripts                     <- Scripts to scale test-time compute for models
-├── pyproject.toml              <- Installation config (mostly used for configuring code quality & tests)
-├── setup.py                    <- Makes project pip installable (pip install -e .) so `sal` can be imported
-├── src                         <- Source code for use in this project
-└── tests                       <- Unit tests
+```shell
+uv run python scripts/test_time_compute.py $CONFIG --push_to_hub=true
 ```
 
-## Replicating our test-time compute results
+Override any config value from the command line:
 
-The [`recipes` README](recipes/README.md) includes launch commands and config files in order to replicate our results.
+```shell
+uv run python scripts/test_time_compute.py $CONFIG \
+    --model_path=meta-llama/Llama-3.2-8B-Instruct \
+    --prm_path=Skywork/Skywork-o1-Open-PRM-Qwen-2.5-1.5B \
+    --dataset_name=AI-MO/aimo-validation-aime \
+    --dataset_split=train \
+    --n=64 \
+    --seed=42
+```
 
+> **Note:** Default configs use a Llama 3 chat template optimized for math reasoning. For other model families, set `--custom_chat_template=none`.
+
+## Multi-Temperature Sampling
+
+All three algorithms support distributing completions across multiple temperatures to increase diversity. See [`TEST_GUIDE.md`](TEST_GUIDE.md) for full details.
+
+```shell
+# Best-of-N: split n completions proportionally across temperatures
+uv run python scripts/test_time_compute.py $CONFIG \
+    --temperatures "0.6,0.8,1.0" \
+    --temperature_ratios "0.33,0.34,0.33" \
+    --n 12
+
+# Beam search / DVTS: each beam cycles through the temperature list
+uv run python scripts/test_time_compute.py $CONFIG \
+    --approach beam_search \
+    --temperatures "0.6,0.8,1.0" \
+    --beam_width 3 --n 12
+```
+
+## Large-Scale Experiments
+
+Running full experiments (500 problems, `n=256`, multiple seeds) requires parallelization. The repo includes Slurm array job scripts and automation utilities.
+
+### Parallelized generation
+
+```shell
+# Submit an array job (shards dataset across tasks)
+sbatch recipes/launch_array_default.slurm recipes/Qwen2.5-3B-Instruct/best_of_n.yaml \
+    --n=256 --seed=0 \
+    --hub_dataset_id=<YOUR_ORG>/Qwen2.5-3B-best_of_n-completions
+
+# Merge results after all tasks complete
+python scripts/merge_chunks.py \
+    --dataset_name=<YOUR_ORG>/Qwen2.5-3B-best_of_n-completions \
+    --filter_strings seed-0
+```
+
+### Automation scripts
+
+Convenience scripts for bulk experiment management:
+
+```shell
+./run_default.sh          # Submit all default experiment jobs
+./run_hnc.sh              # Submit hot/cold temperature experiments
+./merge_default.sh        # Merge all completed parallel results
+python scripts/run_missing_auto.py --dry-run   # Find and submit missing ranges
+```
+
+## Training PRMs
+
+Fine-tune your own PRM with TRL:
+
+```shell
+pip install -e '.[trl]'
+# See recipes/training/ for model-specific training scripts
+```
+
+The [`training` README](recipes/training/README.md) covers training on custom data and evaluating on [ProcessBench](https://arxiv.org/abs/2412.06559).
+
+## Project Structure
+
+```
+├── src/sal/               # Core library (config, search algorithms, PRM inference)
+│   ├── config.py          # Central Config dataclass
+│   ├── models/            # PRM loading and inference
+│   ├── search/            # best_of_n, beam_search, dvts algorithms
+│   └── utils/             # Data loading, scoring, temperature scheduling
+├── scripts/               # Experiment entry points and automation
+│   ├── test_time_compute.py   # Main experiment runner
+│   ├── merge_chunks.py        # Merge parallel job results
+│   └── run_missing_auto.py    # Automated missing-job detection/submission
+├── recipes/               # YAML configs per model/algorithm + Slurm launchers
+├── prm-toolkit/           # PRM server infrastructure (git submodule)
+└── TEST_GUIDE.md          # Multi-temperature testing guide
+```
 
 ## Citation
 
-If you find the content of this repo useful in your work, please cite it as follows via `\usepackage{biblatex}`:
-
-```
+```bibtex
 @misc{beeching2024scalingtesttimecompute,
       title={Scaling test-time compute with open models},
       author={Edward Beeching and Lewis Tunstall and Sasha Rush},
@@ -100,17 +173,14 @@ If you find the content of this repo useful in your work, please cite it as foll
 }
 ```
 
-Please also cite the original work by DeepMind upon which this repo is based:
-
-```
+```bibtex
 @misc{snell2024scalingllmtesttimecompute,
-      title={Scaling LLM Test-Time Compute Optimally can be More Effective than Scaling Model Parameters}, 
+      title={Scaling LLM Test-Time Compute Optimally can be More Effective than Scaling Model Parameters},
       author={Charlie Snell and Jaehoon Lee and Kelvin Xu and Aviral Kumar},
       year={2024},
       eprint={2408.03314},
       archivePrefix={arXiv},
       primaryClass={cs.LG},
-      url={https://arxiv.org/abs/2408.03314}, 
+      url={https://arxiv.org/abs/2408.03314},
 }
 ```
-
