@@ -51,12 +51,12 @@ export CXX=$(which g++)
 
 # PRM 모델 설정
 export PRM=Skywork/Skywork-o1-Open-PRM-Qwen-2.5-1.5B
+DATASET_NAME="ENSEONG/math-private"
 
 # Note: dataset_start, dataset_end, and seed should be passed as command-line arguments
 # via --dataset_start, --dataset_end, and --seed when calling this script
 
 python scripts/test_time_compute.py "$@" \
-	--gpu_memory_utilization=0.2 \
-    	--num_samples=500 \
+	--dataset_name=$DATASET_NAME \
 	--prm_path=$PRM \
 	--push_to_hub=true

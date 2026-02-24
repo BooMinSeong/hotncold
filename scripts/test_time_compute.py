@@ -61,6 +61,7 @@ def main():
         max_tokens=config.max_model_len,
         use_local_mode=True,
         gpu_memory_utilization=0.9-config.gpu_memory_utilization,
+        tensor_parallel_size=num_gpus,
         )
 
     prm = load_prm_server(prm_config)

@@ -3,11 +3,11 @@
 # cpu, gpu Setting
 #SBATCH --qos=hpgpu
 #SBATCH --partition=A100-80GB
-#SBATCH --exclude=n80
+#SBATCH --exclude=n79,n80
 #SBATCH --gres=gpu:1                   # Number of GPUs (per node)
 #SBATCH --cpus-per-task=8              # CPU cores/threads
 
-#SBATCH --array=1-10%10 # Array range (this creates 10 tasks with IDs from 1 to 10, with max 10 tasks concurrently)
+#SBATCH --array=1-5%10 # Array range (this creates 10 tasks with IDs from 1 to 10, with max 10 tasks concurrently)
 #SBATCH --output=logs/%x/%A/task_%a.out
 #SBATCH --error=logs/%x/%A/task_%a.err
 #SBATCH --time=12:00:00
@@ -25,6 +25,7 @@ module load gnu12/12.2.0
 module load cuda/12.6
 echo "module load complete"
 # 환경 설정
+
 source ~/.bashrc
 source .venv/bin/activate
 echo "venv activate complete"
@@ -34,7 +35,7 @@ export CC=$(which gcc)
 export CXX=$(which g++)
 echo "compiler set compelete"
 
-STEP=500
+STEP=1000
 TASK_INDEX=$((SLURM_ARRAY_TASK_ID - 1))
 DATASET_START=$((TASK_INDEX * STEP))
 DATASET_END=$((DATASET_START + STEP))
@@ -46,6 +47,5 @@ export PRM=Skywork/Skywork-o1-Open-PRM-Qwen-2.5-1.5B
 python scripts/test_time_compute.py "$@" \
     --dataset_start=$DATASET_START \
     --dataset_end=$DATASET_END \
-    --num_samples=500 \
     --prm_path=$PRM \
     --push_to_hub=true

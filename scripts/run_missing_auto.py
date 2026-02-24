@@ -49,10 +49,10 @@ class AutoRunConfig:
     dataset_name: str = "math-private"  # "MATH-500"
     hub_org: str = "ENSEONG"
     total_samples: int = 5000
-    chunk_size: int = 500  # Split missing ranges into chunks of this size
+    chunk_size: int = 1000  # Split missing ranges into chunks of this size
 
     seeds: List[int] = field(default_factory=lambda: [0, 42, 64])
-    temperatures: List[float] = field(default_factory=lambda: [0.1, 0.2, 0.4, 0.8])
+    temperatures: List[float] = field(default_factory=lambda: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2])
     methods: Dict[str, str] = field(
         default_factory=lambda: {
             "bon": "best_of_n.yaml",
