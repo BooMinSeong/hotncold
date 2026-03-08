@@ -7,10 +7,10 @@
 #SBATCH --gres=gpu:1                   # Number of GPUs (per node)
 #SBATCH --cpus-per-task=8              # CPU cores/threads
 
-#SBATCH --array=1-5%10 # Array range (this creates 10 tasks with IDs from 1 to 10, with max 10 tasks concurrently)
+#SBATCH --array=1-1%10 # Array range (this creates 10 tasks with IDs from 1 to 10, with max 10 tasks concurrently)
 #SBATCH --output=logs/%x/%A/task_%a.out
 #SBATCH --error=logs/%x/%A/task_%a.err
-#SBATCH --time=12:00:00
+#SBATCH --time=24:00:00
 
 #  '''Usage:
 #  # Best-of-N on the MATH-500 dataset
@@ -35,7 +35,7 @@ export CC=$(which gcc)
 export CXX=$(which g++)
 echo "compiler set compelete"
 
-STEP=1000
+STEP=5000
 TASK_INDEX=$((SLURM_ARRAY_TASK_ID - 1))
 DATASET_START=$((TASK_INDEX * STEP))
 DATASET_END=$((DATASET_START + STEP))
