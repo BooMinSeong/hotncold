@@ -13,13 +13,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+
 import numpy as np
+from prm_toolkit import PrmServer
 from vllm import LLM, SamplingParams
 
 from sal.config import Config
-from sal.utils.score import aggregate_scores
-from prm_toolkit import PrmServer
 from sal.search.prm_utils import flatten_completions, unflatten_scores
+from sal.utils.score import aggregate_scores
+
+logger = logging.getLogger(__name__)
 
 
 def best_of_n(x, config: Config, llm: LLM, prm: PrmServer):
@@ -94,8 +98,10 @@ def best_of_n(x, config: Config, llm: LLM, prm: PrmServer):
         if len(c) != config.n:
             raise ValueError(f"Generated {len(c)} completions instead of {config.n}")
 
-    # scores = prm.score(x["problem"], completions)
-    flat_prompts, flat_responses, structure = flatten_completions(x["problem"], completions)
+    # PRM's own validate_length handles truncation with the correct tokenizer and formatting
+    flat_prompts, flat_responses, structure = flatten_completions(
+        x["problem"], completions
+    )
     flat_scores = prm.score_batch(flat_prompts, flat_responses)
     scores = unflatten_scores(flat_scores, structure)
     agg_scores = [
