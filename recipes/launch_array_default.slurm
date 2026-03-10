@@ -3,6 +3,7 @@
 # cpu, gpu Setting
 #SBATCH --qos=hpgpu
 #SBATCH --partition=A100-80GB
+# SBATCH --partition=L40S
 #SBATCH --exclude=n79,n80
 #SBATCH --gres=gpu:1                   # Number of GPUs (per node)
 #SBATCH --cpus-per-task=8              # CPU cores/threads
@@ -33,6 +34,10 @@ echo "venv activate complete"
 # 컴파일러 명시 설정
 export CC=$(which gcc)
 export CXX=$(which g++)
+
+# Redirect HF datasets cache to node-local /tmp to avoid home directory quota issues
+# (HF_HOME is NOT changed, so model downloads still use ~/.cache/huggingface/hub/)
+export HF_DATASETS_CACHE=/tmp/hf_datasets_cache_${SLURM_JOB_ID}
 echo "compiler set compelete"
 
 STEP=5000

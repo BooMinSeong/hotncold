@@ -15,6 +15,7 @@
 
 import logging
 
+import datasets
 import torch
 from vllm import LLM
 
@@ -40,6 +41,8 @@ APPROACHES = {
 
 
 def main():
+    datasets.disable_caching()
+
     parser = H4ArgumentParser(Config)
     config = parser.parse()
 
