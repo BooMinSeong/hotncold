@@ -65,20 +65,38 @@ def infer_config_from_order(
     mapping = {}
 
     for batch in batches:
-        if len(batch) != expected_per_batch:
-            continue
-        for idx, jid in enumerate(batch):
-            temp_idx = idx // len(seeds)
-            seed_idx = idx % len(seeds)
-            temp = round(temp_start + temp_idx * temp_step, 2)
-            mapping[str(jid)] = {
-                "approach": "best_of_n",
-                "temperature": temp,
-                "seed": seeds[seed_idx],
-                "dataset_start": 0,
-                "dataset_end": 5000,
-                "hub_dataset_id": "(inferred)",
-            }
+        if len(batch) == expected_per_batch:
+            # Perfect batch: use positional index
+            for idx, jid in enumerate(batch):
+                temp_idx = idx // len(seeds)
+                seed_idx = idx % len(seeds)
+                temp = round(temp_start + temp_idx * temp_step, 2)
+                mapping[str(jid)] = {
+                    "approach": "best_of_n",
+                    "temperature": temp,
+                    "seed": seeds[seed_idx],
+                    "dataset_start": 0,
+                    "dataset_end": 5000,
+                    "hub_dataset_id": "(inferred)",
+                }
+        elif len(batch) <= expected_per_batch:
+            # Incomplete batch (gaps from failed jobs): use offset from first ID
+            base_id = batch[0]
+            for jid in batch:
+                idx = jid - base_id
+                if idx >= expected_per_batch:
+                    break
+                temp_idx = idx // len(seeds)
+                seed_idx = idx % len(seeds)
+                temp = round(temp_start + temp_idx * temp_step, 2)
+                mapping[str(jid)] = {
+                    "approach": "best_of_n",
+                    "temperature": temp,
+                    "seed": seeds[seed_idx],
+                    "dataset_start": 0,
+                    "dataset_end": 5000,
+                    "hub_dataset_id": "(inferred)",
+                }
 
     return mapping
 
@@ -118,7 +136,7 @@ def classify_job(err_path: Path) -> tuple[str, str]:
     return "success", ""
 
 
-def scan_logs(log_dir: Path) -> list[dict]:
+def scan_logs(log_dir: Path, seeds: list[int] | None = None) -> list[dict]:
     """Scan all job directories and collect results."""
     results = []
     missing_config_ids = []
@@ -157,7 +175,7 @@ def scan_logs(log_dir: Path) -> list[dict]:
     # Fill in missing configs using submission order inference
     if missing_config_ids:
         all_ids = [r["job_id"] for r in results]
-        inferred = infer_config_from_order(all_ids)
+        inferred = infer_config_from_order(all_ids, seeds=seeds or [0, 42, 64])
         for r in results:
             if "temperature" not in r and r["job_id"] in inferred:
                 r.update(inferred[r["job_id"]])
@@ -321,13 +339,20 @@ def main():
     )
     parser.add_argument("--show-all", action="store_true", help="Show successful jobs too")
     parser.add_argument("--matrix", action="store_true", help="Show only the temperature × seed matrix")
+    parser.add_argument(
+        "--seeds",
+        type=str,
+        default="0,42,64",
+        help="Comma-separated seed list for order inference (default: 0,42,64)",
+    )
     args = parser.parse_args()
+    args.seeds = [int(s) for s in args.seeds.split(",")]
 
     if not args.log_dir.exists():
         print(f"Error: {args.log_dir} does not exist")
         return 1
 
-    results = scan_logs(args.log_dir)
+    results = scan_logs(args.log_dir, seeds=args.seeds)
 
     if not results:
         print("No log files found.")

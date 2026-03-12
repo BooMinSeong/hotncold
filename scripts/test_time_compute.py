@@ -46,6 +46,8 @@ def main():
     parser = H4ArgumentParser(Config)
     config = parser.parse()
 
+    logger.info("Config: %s", config)
+
     approach_fn = APPROACHES[config.approach]
 
     num_gpus = torch.cuda.device_count()
