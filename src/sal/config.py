@@ -26,7 +26,7 @@ class Config:
     approach: Literal["best_of_n", "beam_search", "dvts"] = "best_of_n"
     model_path: str = "Qwen/Qwen2.5-1.5B-Instruct"
     gpu_memory_utilization: float = (
-        0.45  # vllm is allocated 0.5 of GPU memory, the PRM uses the rest
+        0.9  # vllm uses most GPU memory (no PRM)
     )
     prm_path: str = "Skywork/Skywork-o1-Open-PRM-Qwen-2.5-1.5B"
     prm_base_url: str = None

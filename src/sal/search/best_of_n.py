@@ -15,18 +15,19 @@
 
 import logging
 
-import numpy as np
-from prm_toolkit import PrmServer
 from vllm import LLM, SamplingParams
 
 from sal.config import Config
-from sal.search.prm_utils import flatten_completions, unflatten_scores
-from sal.utils.score import aggregate_scores
+
+# import numpy as np
+# from prm_toolkit import PrmServer
+# from sal.search.prm_utils import flatten_completions, unflatten_scores
+# from sal.utils.score import aggregate_scores
 
 logger = logging.getLogger(__name__)
 
 
-def best_of_n(x, config: Config, llm: LLM, prm: PrmServer):
+def best_of_n(x, config: Config, llm: LLM, prm=None):
     from sal.utils.temperature import get_temperature_assignment
 
     tokenizer = llm.get_tokenizer()
@@ -98,18 +99,19 @@ def best_of_n(x, config: Config, llm: LLM, prm: PrmServer):
         if len(c) != config.n:
             raise ValueError(f"Generated {len(c)} completions instead of {config.n}")
 
-    # PRM's own validate_length handles truncation with the correct tokenizer and formatting
-    flat_prompts, flat_responses, structure = flatten_completions(
-        x["problem"], completions
-    )
-    flat_scores = prm.score_batch(flat_prompts, flat_responses)
-    scores = unflatten_scores(flat_scores, structure)
-    agg_scores = [
-        [aggregate_scores(s, config.agg_strategy) for s in score] for score in scores
-    ]
+    # PRM scoring commented out — using first completion as pred
+    # flat_prompts, flat_responses, structure = flatten_completions(
+    #     x["problem"], completions
+    # )
+    # flat_scores = prm.score_batch(flat_prompts, flat_responses)
+    # scores = unflatten_scores(flat_scores, structure)
+    # agg_scores = [
+    #     [aggregate_scores(s, config.agg_strategy) for s in score] for score in scores
+    # ]
 
-    # Select the completion with the highest score
-    pred = [completion[np.argmax(s)] for completion, s in zip(completions, agg_scores)]
+    # Select the first completion (no PRM ranking)
+    pred = [completions[i][0] for i in range(len(completions))]
+    scores = [[] for _ in range(len(completions))]
 
     x["completions"] = completions
     x["scores"] = scores
