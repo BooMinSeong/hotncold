@@ -39,6 +39,7 @@ class JobConfig:
     dataset_end: int
     hub_dataset_id: str
     model_name: str
+    dataset_name: str
 
 
 @dataclass
@@ -134,6 +135,7 @@ class MissingJobFinder:
                                     dataset_end=chunk_end,
                                     hub_dataset_id=dataset_repo,
                                     model_name=self.config.model_name,
+                                    dataset_name=self.config.dataset_name,
                                 )
                             )
 
@@ -158,6 +160,7 @@ class JobSubmitter:
             f"--dataset_end={job.dataset_end}",
             f"--seed={job.seed}",
             f"--temperature={job.temperature}",
+            f"--dataset_name={job.dataset_name}",
         ]
 
         print(
@@ -222,11 +225,39 @@ Examples:
         default="Qwen2.5-3B-Instruct",
         help="Model name (default: Qwen2.5-3B-Instruct)",
     )
+    parser.add_argument(
+        "--dataset",
+        default="math-private",
+        help="Dataset name (default: math-private)",
+    )
+    parser.add_argument(
+        "--seeds",
+        type=str,
+        default="0,42,64,128,256,512",
+        help="Comma-separated seed list (default: 0,42,64,128,256,512)",
+    )
+    parser.add_argument(
+        "--hub-org",
+        default="ENSEONG",
+        help="Hub organization (default: ENSEONG)",
+    )
+    parser.add_argument(
+        "--total-samples",
+        type=int,
+        default=5000,
+        help="Total samples in dataset (default: 5000)",
+    )
 
     args = parser.parse_args()
 
     # Configure
-    config = AutoRunConfig(model_name=args.model)
+    config = AutoRunConfig(
+        model_name=args.model,
+        dataset_name=args.dataset,
+        hub_org=args.hub_org,
+        total_samples=args.total_samples,
+        seeds=[int(s) for s in args.seeds.split(",")],
+    )
     finder = MissingJobFinder(config)
     submitter = JobSubmitter(dry_run=not args.submit, interactive=args.interactive)
 

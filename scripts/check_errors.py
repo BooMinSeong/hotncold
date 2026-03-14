@@ -39,10 +39,11 @@ def parse_config_from_err(err_path: Path) -> dict | None:
 
 def infer_config_from_order(
     job_ids: list[str],
-    seeds: list[int] = [0, 42, 64],
+    seeds: list[int] = [0, 42, 64, 128, 256, 512],
     temp_start: float = 0.1,
     temp_step: float = 0.1,
     temp_count: int = 12,
+    dataset_end: int = 5000,
 ) -> dict[str, dict]:
     """Infer temperature/seed from submission order for jobs missing Config dump.
 
@@ -76,7 +77,7 @@ def infer_config_from_order(
                     "temperature": temp,
                     "seed": seeds[seed_idx],
                     "dataset_start": 0,
-                    "dataset_end": 5000,
+                    "dataset_end": dataset_end,
                     "hub_dataset_id": "(inferred)",
                 }
         elif len(batch) <= expected_per_batch:
@@ -94,7 +95,7 @@ def infer_config_from_order(
                     "temperature": temp,
                     "seed": seeds[seed_idx],
                     "dataset_start": 0,
-                    "dataset_end": 5000,
+                    "dataset_end": dataset_end,
                     "hub_dataset_id": "(inferred)",
                 }
 
@@ -136,7 +137,7 @@ def classify_job(err_path: Path) -> tuple[str, str]:
     return "success", ""
 
 
-def scan_logs(log_dir: Path, seeds: list[int] | None = None) -> list[dict]:
+def scan_logs(log_dir: Path, seeds: list[int] | None = None, dataset_end: int = 5000) -> list[dict]:
     """Scan all job directories and collect results."""
     results = []
     missing_config_ids = []
@@ -175,7 +176,7 @@ def scan_logs(log_dir: Path, seeds: list[int] | None = None) -> list[dict]:
     # Fill in missing configs using submission order inference
     if missing_config_ids:
         all_ids = [r["job_id"] for r in results]
-        inferred = infer_config_from_order(all_ids, seeds=seeds or [0, 42, 64])
+        inferred = infer_config_from_order(all_ids, seeds=seeds or [0, 42, 64, 128, 256, 512], dataset_end=dataset_end)
         for r in results:
             if "temperature" not in r and r["job_id"] in inferred:
                 r.update(inferred[r["job_id"]])
@@ -342,8 +343,14 @@ def main():
     parser.add_argument(
         "--seeds",
         type=str,
-        default="0,42,64",
-        help="Comma-separated seed list for order inference (default: 0,42,64)",
+        default="0,42,64,128,256,512",
+        help="Comma-separated seed list for order inference (default: 0,42,64,128,256,512)",
+    )
+    parser.add_argument(
+        "--dataset-end",
+        type=int,
+        default=5000,
+        help="Dataset end index for order inference (default: 5000)",
     )
     args = parser.parse_args()
     args.seeds = [int(s) for s in args.seeds.split(",")]
@@ -352,7 +359,7 @@ def main():
         print(f"Error: {args.log_dir} does not exist")
         return 1
 
-    results = scan_logs(args.log_dir, seeds=args.seeds)
+    results = scan_logs(args.log_dir, seeds=args.seeds, dataset_end=args.dataset_end)
 
     if not results:
         print("No log files found.")
