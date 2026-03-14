@@ -1,6 +1,7 @@
 #!/bin/bash
 
-SEEDS=(0 42 64)
+# SEEDS=(0 42 64)
+SEEDS=(128 256 512)
 METHOD_NAMES=("bon" "beam_search" "dvts")
 TEMPERATURE=0.1
 DATASET_NAME="math-ai/aime25" # "math-ai/aime25" # "HuggingFaceH4/MATH-500"

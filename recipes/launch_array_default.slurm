@@ -34,11 +34,22 @@ echo "venv activate complete"
 # 컴파일러 명시 설정
 export CC=$(which gcc)
 export CXX=$(which g++)
+echo "compiler set complete"
 
-# Redirect HF datasets cache to node-local /tmp to avoid home directory quota issues
-# (HF_HOME is NOT changed, so model downloads still use ~/.cache/huggingface/hub/)
-export HF_DATASETS_CACHE=/tmp/hf_datasets_cache_${SLURM_JOB_ID}
-echo "compiler set compelete"
+# Prolog이 생성한 로컬 SSD 환경변수 로드 (HF_HOME, HF_DATASETS_CACHE, WANDB_DIR 등)
+ENV_FILE="/run/slurm/job_env_${SLURM_JOB_ID}"
+if [ -f "$ENV_FILE" ]; then
+    source "$ENV_FILE"
+    echo "sourced prolog env: $ENV_FILE"
+    # HF_HOME이 로컬 SSD로 가면 모델을 매번 다시 다운로드하므로,
+    # hub 캐시만 홈 디렉토리를 사용하도록 복원
+    export HF_HUB_CACHE="$HOME/.cache/huggingface/hub"
+    export HF_TOKEN=$(cat "$HOME/.cache/huggingface/token" 2>/dev/null)
+    mkdir -p "$HF_DATASETS_CACHE"
+    echo "HF_HUB_CACHE restored to $HF_HUB_CACHE"
+else
+    echo "[WARN] prolog env not found: $ENV_FILE (local SSD caching disabled)"
+fi
 
 STEP=5000
 TASK_INDEX=$((SLURM_ARRAY_TASK_ID - 1))

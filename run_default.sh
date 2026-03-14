@@ -1,16 +1,23 @@
 #!/bin/bash
 
-SEEDS=(0 42 64)
+# SEEDS=(0 42 64)
+SEEDS=(128 256 512)
 SEARCH_METHODS=("best_of_n.yaml") # "beam_search.yaml" "dvts.yaml"
 METHOD_NAMES=("bon") # "beam_search"  "dvts"
-# TEMPERATURE=0.1
 # DATASET_NAME="HuggingFaceH4/MATH-500" # math-ai/aime25 "HuggingFaceH4/MATH-500"
 DATASET_NAME="ENSEONG/math-private" # math-ai/aime25 "HuggingFaceH4/MATH-500" "ENSEONG/math-private"
-MODEL_NAME="Llama-3.2-3B-Instruct" # meta-llama/Llama-3.2-3B-Instruct # Qwen2.5-3B-Instruct # Qwen3-4B-Instruct-2507
+# MODEL_NAME="Llama-3.2-3B-Instruct" # meta-llama/Llama-3.2-3B-Instruct # Qwen2.5-3B-Instruct # Qwen3-4B-Instruct-2507
+MODEL_NAME="Qwen2.5-3B-Instruct"
 
 JOB_COUNT=0
 QOS_LIMIT=16
 
+
+# Initialize Log
+rm -r logs/default_run/*
+
+# TEMPERATURES=(1.0)
+# for TEMPERATURE in "${TEMPERATURES[@]}"; do
 for TEMPERATURE in $(seq 0.1 0.1 1.2); do
 	# 각 search method와 dataset name을 순회
 	for i in "${!SEARCH_METHODS[@]}"; do
