@@ -1,10 +1,10 @@
 # refer to src/sal/config.py for more options
 
-model_path: meta-llama/Llama-3.2-3B-Instruct
+model_path: Qwen/Qwen3-4B-Instruct-2507
 custom_chat_template: null
 filter_duplicates: true
 approach: beam_search
 n: 64
 search_batch_size: 1  # DO NOT CHANGE!
 prm_batch_size: 1
-seed: 0
+seed: 42

@@ -18,11 +18,12 @@ import logging
 from collections import defaultdict
 
 import numpy as np
+from prm_toolkit import PrmServer
 from tqdm import tqdm
 from vllm import LLM, SamplingParams
 
 from sal.config import Config
-from sal.models.reward_models import PRM
+from sal.search.prm_utils import flatten_completions, unflatten_scores
 from sal.utils.score import aggregate_scores
 from sal.utils.temperature import get_temperature_assignment
 
@@ -31,7 +32,47 @@ from .utils import Beam, build_conv
 logger = logging.getLogger()
 
 
-def _dvts(batch_of_prompts: list[str], config: Config, llm: LLM, prm: PRM):
+def _check_token_length_exceeded(
+    beam: Beam,
+    tokenizer,
+    config: Config,
+    iteration: int,
+) -> bool:
+    """
+    Check if beam's current text exceeds max_model_len when templated.
+
+    Returns True if the beam should be pruned due to token length.
+    """
+    # Build conversation with current accumulated text
+    conv = build_conv(beam.prompt, beam.current_text, config.system_prompt)
+
+    # Apply same chat template that will be used for generation
+    templated_prompt = tokenizer.apply_chat_template(
+        conv,
+        add_generation_prompt=(iteration == 0),
+        continue_final_message=(iteration > 0),
+        tokenize=False,
+    )
+
+    # Encode to get actual token count
+    prompt_token_ids = tokenizer.encode(templated_prompt)
+    prompt_token_count = len(prompt_token_ids)
+
+    # Check if we have room for at least 1 token generation
+    # vLLM requires: prompt_tokens + max_tokens <= max_model_len
+    # But we need at least 1 token to generate, so check: prompt_tokens + 1 <= max_model_len
+    if prompt_token_count >= config.max_model_len:
+        logger.warning(
+            f"Beam {beam.index} exceeds max_model_len: "
+            f"prompt has {prompt_token_count} tokens, max is {config.max_model_len}, "
+            f"cannot generate any new tokens"
+        )
+        return True
+
+    return False
+
+
+def _dvts(batch_of_prompts: list[str], config: Config, llm: LLM, prm: PrmServer):
     sampling_params = SamplingParams(
         temperature=config.temperature,
         max_tokens=2048,
@@ -131,7 +172,7 @@ def _dvts(batch_of_prompts: list[str], config: Config, llm: LLM, prm: PRM):
                 beam.stop_reasons.append(output.outputs[0].finish_reason)
                 output_idx += 1
 
-                # Prepare for PRM scoring
+                # Prepare for PrmServer scoring
                 prompts_prm.append(beam.prompt)
                 completions_prm.append([beam.current_text + beam.next_texts[path_idx]])
 
@@ -141,8 +182,15 @@ def _dvts(batch_of_prompts: list[str], config: Config, llm: LLM, prm: PRM):
                     f"beam {beam.index} has {len(beam.next_texts)} completions"
                 )
 
+        # Score all diverse paths with PrmServer
+        # all_scores = prm.score(prompts_prm, completions_prm)
+
         # Score all diverse paths with PRM
-        all_scores = prm.score(prompts_prm, completions_prm)
+        flat_prompts, flat_responses, structure = flatten_completions(
+            prompts_prm, completions_prm
+        )
+        flat_scores = prm.score_batch(flat_prompts, flat_responses)
+        all_scores = unflatten_scores(flat_scores, structure)
 
         # Assign scores and select best path for each beam
         score_idx = 0
@@ -168,6 +216,13 @@ def _dvts(batch_of_prompts: list[str], config: Config, llm: LLM, prm: PRM):
                 or beam.stop_reasons[best_score_ind] == "length"
             ):
                 # stopped on EOS, prune
+                beam.pruned = True
+
+            # Check token length after stop_reason validation
+            # This catches beams that didn't stop on 'length' but still exceed max_model_len
+            if not beam.pruned and _check_token_length_exceeded(
+                beam, tokenizer, config, i + 1
+            ):
                 beam.pruned = True
 
         #             if beam.next_texts[best_score_ind] == "":
@@ -202,7 +257,7 @@ def _dvts(batch_of_prompts: list[str], config: Config, llm: LLM, prm: PRM):
     return output
 
 
-def dvts(examples, config: Config, llm: LLM, prm: PRM):
+def dvts(examples, config: Config, llm: LLM, prm: PrmServer):
     problems = examples["problem"]
     beam_results = _dvts(problems, config, llm, prm)
 

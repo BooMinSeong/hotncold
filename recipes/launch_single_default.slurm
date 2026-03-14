@@ -3,13 +3,13 @@
 # cpu, gpu Setting
 #SBATCH --qos=hpgpu
 #SBATCH --partition=A100-80GB
-#SBATCH --exclude=n80
-#SBATCH --gres=gpu:2
+#SBATCH --exclude=n80,n79,n52
+#SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=8              # CPU cores/threads
 
 #SBATCH --output=logs/%x/%A/task_%a.out
 #SBATCH --error=logs/%x/%A/task_%a.err
-#SBATCH --time=12:00:00
+#SBATCH --time=24:00:00
 
  '''Usage:
  # Individual run with specific dataset range (default temperature settings)
@@ -49,14 +49,29 @@ source .venv/bin/activate
 export CC=$(which gcc)
 export CXX=$(which g++)
 
+# Prolog이 생성한 로컬 SSD 환경변수 로드 (HF_HOME, HF_DATASETS_CACHE, WANDB_DIR 등)
+ENV_FILE="/run/slurm/job_env_${SLURM_JOB_ID}"
+if [ -f "$ENV_FILE" ]; then
+    source "$ENV_FILE"
+    echo "sourced prolog env: $ENV_FILE"
+    # HF_HOME이 로컬 SSD로 가면 모델을 매번 다시 다운로드하므로,
+    # hub 캐시만 홈 디렉토리를 사용하도록 복원
+    export HF_HUB_CACHE="$HOME/.cache/huggingface/hub"
+    export HF_TOKEN=$(cat "$HOME/.cache/huggingface/token" 2>/dev/null)
+    mkdir -p "$HF_DATASETS_CACHE"
+    echo "HF_HUB_CACHE restored to $HF_HUB_CACHE"
+else
+    echo "[WARN] prolog env not found: $ENV_FILE (local SSD caching disabled)"
+fi
+
 # PRM 모델 설정
 export PRM=Skywork/Skywork-o1-Open-PRM-Qwen-2.5-1.5B
+DATASET_NAME="ENSEONG/math-private"
 
 # Note: dataset_start, dataset_end, and seed should be passed as command-line arguments
 # via --dataset_start, --dataset_end, and --seed when calling this script
 
 python scripts/test_time_compute.py "$@" \
-	--gpu_memory_utilization=0.2 \
-    	--num_samples=500 \
+	--dataset_name=$DATASET_NAME \
 	--prm_path=$PRM \
 	--push_to_hub=true

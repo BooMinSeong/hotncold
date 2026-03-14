@@ -28,7 +28,7 @@ dependencies = [
     "transformers>=4.47.0",
     "fastapi",
     "hf_transfer",
-    "vllm>=0.13.0",
+    "vllm>=0.15.0",
     "datasets>=4.4.2",
     "matplotlib>=3.7.0",
     "seaborn>=0.12.0",
