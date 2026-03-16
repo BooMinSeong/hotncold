@@ -59,7 +59,7 @@ class Config:
     prm_batch_size: int = 2
     search_batch_size: int = 4
     seed: int = 42
-    max_tokens: int = 2048
+    max_tokens: int = 4095
     max_model_len: int = 4096
     agg_strategy: str = "last"  # Options: "last", "min", "prod"
 

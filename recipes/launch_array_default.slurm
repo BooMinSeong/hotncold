@@ -1,10 +1,10 @@
 #!/bin/bash
 #SBATCH --job-name=default_run # Job name
 # cpu, gpu Setting
-#SBATCH --qos=hpgpu
-#SBATCH --partition=A100-80GB
-# SBATCH --partition=L40S
-#SBATCH --exclude=n79,n80
+# SBATCH --qos=hpgpu
+# SBATCH --partition=A100-80GB
+#SBATCH --partition=L40S
+#SBATCH --exclude=n52
 #SBATCH --gres=gpu:1                   # Number of GPUs (per node)
 #SBATCH --cpus-per-task=8              # CPU cores/threads
 
@@ -35,6 +35,10 @@ echo "venv activate complete"
 export CC=$(which gcc)
 export CXX=$(which g++)
 echo "compiler set complete"
+
+# 이전 job에서 상속된 환경변수 제거 (sbatch --export=ALL 기본 동작으로 인한 오염 방지)
+unset HF_HOME HF_DATASETS_CACHE WANDB_DIR TMPDIR LOCAL_JOB_BASE
+unset TORCHINDUCTOR_CACHE_DIR TRITON_CACHE_DIR TRITON_CACHE_MANAGER
 
 # Prolog이 생성한 로컬 SSD 환경변수 로드 (HF_HOME, HF_DATASETS_CACHE, WANDB_DIR 등)
 ENV_FILE="/run/slurm/job_env_${SLURM_JOB_ID}"

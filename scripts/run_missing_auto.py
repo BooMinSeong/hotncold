@@ -71,8 +71,9 @@ class MissingJobFinder:
 
     def build_dataset_name(self, method: str) -> str:
         """Construct HuggingFace dataset repo name."""
-        # return f"{self.config.hub_org}/default-{self.config.dataset_name}-{self.config.model_name}-{method}"
-        return f"{self.config.hub_org}/full-{self.config.dataset_name}-{self.config.model_name}-{method}"
+        # "ENSEONG/gsm8k-private" → "gsm8k-private"
+        short_name = self.config.dataset_name.split("/")[-1]
+        return f"{self.config.hub_org}/full-{short_name}-{self.config.model_name}-{method}"
 
     def split_range(self, start: int, end: int) -> List[tuple]:
         """Split a range into chunks of chunk_size.
@@ -145,14 +146,35 @@ class MissingJobFinder:
 class JobSubmitter:
     """Handles job submission via sbatch."""
 
-    def __init__(self, dry_run: bool = True, interactive: bool = False):
+    QOS_LIMIT = 16
+
+    def __init__(
+        self,
+        dry_run: bool = True,
+        interactive: bool = False,
+        partition: str = "L40S",
+    ):
         self.dry_run = dry_run
         self.interactive = interactive
+        self.partition = partition
+        self.job_count = 0
 
     def submit(self, job: JobConfig) -> bool:
         """Submit a single job. Returns True if submitted."""
+        self.job_count += 1
+
         cmd = [
             "sbatch",
+            f"--partition={self.partition}",
+        ]
+
+        if self.partition == "A100-80GB":
+            if self.job_count > self.QOS_LIMIT:
+                cmd.append("--qos=add_hpgpu")
+            else:
+                cmd.append("--qos=hpgpu")
+
+        cmd.extend([
             "recipes/launch_single_default.slurm",
             f"recipes/{job.model_name}/{job.method_yaml}",
             f"--hub_dataset_id={job.hub_dataset_id}",
@@ -161,7 +183,7 @@ class JobSubmitter:
             f"--seed={job.seed}",
             f"--temperature={job.temperature}",
             f"--dataset_name={job.dataset_name}",
-        ]
+        ])
 
         print(
             f"  [{job.method}] seed={job.seed} T={job.temperature} "
@@ -247,6 +269,11 @@ Examples:
         default=5000,
         help="Total samples in dataset (default: 5000)",
     )
+    parser.add_argument(
+        "--partition",
+        default="A100-80GB",
+        help="GPU partition (default: A100-80GB)",
+    )
 
     args = parser.parse_args()
 
@@ -259,7 +286,11 @@ Examples:
         seeds=[int(s) for s in args.seeds.split(",")],
     )
     finder = MissingJobFinder(config)
-    submitter = JobSubmitter(dry_run=not args.submit, interactive=args.interactive)
+    submitter = JobSubmitter(
+        dry_run=not args.submit,
+        interactive=args.interactive,
+        partition=args.partition,
+    )
 
     # Find missing
     print("Scanning for missing dataset ranges...")
