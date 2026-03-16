@@ -36,9 +36,6 @@ export CC=$(which gcc)
 export CXX=$(which g++)
 echo "compiler set complete"
 
-# 이전 job에서 상속된 환경변수 제거 (sbatch --export=ALL 기본 동작으로 인한 오염 방지)
-unset HF_HOME HF_DATASETS_CACHE WANDB_DIR TMPDIR LOCAL_JOB_BASE
-unset TORCHINDUCTOR_CACHE_DIR TRITON_CACHE_DIR TRITON_CACHE_MANAGER
 
 # Prolog이 생성한 로컬 SSD 환경변수 로드 (HF_HOME, HF_DATASETS_CACHE, WANDB_DIR 등)
 ENV_FILE="/run/slurm/job_env_${SLURM_JOB_ID}"
@@ -47,6 +44,15 @@ if [ -f "$ENV_FILE" ]; then
     echo "sourced prolog env: $ENV_FILE"
     # HF_HOME이 로컬 SSD로 가면 모델을 매번 다시 다운로드하므로,
     # hub 캐시만 홈 디렉토리를 사용하도록 복원
+    # prolog source 후에 추가
+    export TORCHINDUCTOR_CACHE_DIR="$LOCAL_JOB_BASE/torchinductor"
+    export VLLM_CACHE_ROOT="$LOCAL_JOB_BASE/vllm"
+    export TRITON_CACHE_DIR="$LOCAL_JOB_BASE/triton"
+
+    mkdir -p "$TORCHINDUCTOR_CACHE_DIR"
+    mkdir -p "$VLLM_CACHE_ROOT"
+    mkdir -p "$TRITON_CACHE_DIR"
+
     export HF_HUB_CACHE="$HOME/.cache/huggingface/hub"
     export HF_TOKEN=$(cat "$HOME/.cache/huggingface/token" 2>/dev/null)
     mkdir -p "$HF_DATASETS_CACHE"

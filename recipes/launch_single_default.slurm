@@ -49,8 +49,6 @@ source .venv/bin/activate
 export CC=$(which gcc)
 export CXX=$(which g++)
 
-# 이전 job에서 상속된 로컬 SSD 환경변수 제거 (sbatch --export=ALL 기본 동작으로 인한 오염 방지)
-unset HF_HOME HF_DATASETS_CACHE WANDB_DIR TMPDIR LOCAL_JOB_BASE
 
 # Prolog이 생성한 로컬 SSD 환경변수 로드 (HF_HOME, HF_DATASETS_CACHE, WANDB_DIR 등)
 ENV_FILE="/run/slurm/job_env_${SLURM_JOB_ID}"
