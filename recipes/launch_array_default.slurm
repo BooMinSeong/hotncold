@@ -11,7 +11,7 @@
 #SBATCH --array=1-1%10 # Array range (this creates 10 tasks with IDs from 1 to 10, with max 10 tasks concurrently)
 #SBATCH --output=logs/%x/%A/task_%a.out
 #SBATCH --error=logs/%x/%A/task_%a.err
-#SBATCH --time=24:00:00
+#SBATCH --time=48:00:00
 
 #  '''Usage:
 #  # Best-of-N on the MATH-500 dataset
