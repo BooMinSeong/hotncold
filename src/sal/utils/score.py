@@ -18,7 +18,6 @@ import math
 from typing import Literal
 
 from datasets import Dataset
-from tqdm import tqdm
 
 from sal.config import Config
 from sal.utils.math import (
@@ -27,6 +26,7 @@ from sal.utils.math import (
     compute_pass_at_k,
     # compute_weighted_pred,
     extract_completion_answers,
+    score_all_subsets,
     subsample_completions,
 )
 
@@ -45,45 +45,13 @@ def aggregate_scores(
 
 
 def score(dataset: Dataset, config: Config) -> Dataset:
-    # dataset = dataset.map(
-    #     lambda x: {"agg_scores": [aggregate_scores(s, "last") for s in x["scores"]]}
-    # )
     subsets = [2**i for i in range(config.n) if 2**i <= config.n]
-    for n in tqdm(subsets, desc="Computing majority predictions"):
-        dataset = dataset.map(
-            subsample_completions,
-            fn_kwargs={"n": n},
-            num_proc=config.num_proc,
-            desc=f"Subsample {n}",
-        )
-        dataset = dataset.map(
-            extract_completion_answers,
-            fn_kwargs={"n": n},
-            num_proc=config.num_proc,
-            desc=f"Extract answers {n}",
-        )
-        # dataset = dataset.map(
-        #     compute_weighted_pred,
-        #     fn_kwargs={"n": n},
-        #     num_proc=config.num_proc,
-        #     desc=f"Compute weighted pred {n}",
-        # )
-        dataset = dataset.map(
-            compute_maj_pred,
-            fn_kwargs={"n": n},
-            num_proc=config.num_proc,
-            desc=f"Compute majority pred {n}",
-        )
-        # dataset = dataset.map(
-        #     compute_naive_pred,
-        #     fn_kwargs={"n": n},
-        #     num_proc=config.num_proc,
-        #     desc=f"Compute naive pred {n}",
-        # )
-        # Nuke unused columns to keep dataset lean
-        dataset = dataset.remove_columns(
-            [f"completions@{n}", f"preds@{n}"]
-        )
+    dataset = dataset.map(
+        score_all_subsets,
+        fn_kwargs={"subsets": subsets},
+        num_proc=config.num_proc,
+        desc="Computing majority predictions",
+    )
     return dataset
 
 

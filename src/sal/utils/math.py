@@ -233,6 +233,38 @@ def find_majority_answer(answers: List[str]) -> str:
             return canonical_to_original[canonical_form]
 
 
+def score_all_subsets(x: Dict[str, List[Any]], subsets: List[int]) -> Dict[str, str]:
+    """
+    Compute pred_maj@n for all subset sizes in a single pass.
+    Parses completions and computes canonical forms only once per completion.
+    """
+    completions = x["completions"]
+    # Parse all completions once
+    preds = [safe_parse_answer(c) for c in completions]
+    # Compute canonical forms once
+    canonical_preds = [memoized_canonical_form(p) for p in preds]
+
+    result = {}
+    for n in subsets:
+        subset_preds = preds[:n]
+        subset_canonical = canonical_preds[:n]
+
+        canonical_groups: Dict[str, int] = defaultdict(int)
+        canonical_to_original: Dict[str, str] = {}
+        for pred, canonical in zip(subset_preds, subset_canonical):
+            canonical_groups[canonical] += 1
+            if canonical not in canonical_to_original:
+                canonical_to_original[canonical] = pred
+
+        max_count = max(canonical_groups.values())
+        for cf, count in canonical_groups.items():
+            if count == max_count:
+                result[f"pred_maj@{n}"] = "\\boxed{" + canonical_to_original[cf] + "}"
+                break
+
+    return result
+
+
 def pass_at_k(n: int, c: int, k: int) -> float:
     """A numerically stable method for calculating an unbiased estimate of pass@k.
 
