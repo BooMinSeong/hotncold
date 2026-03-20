@@ -25,7 +25,7 @@ from sal.utils.data import get_dataset, save_dataset
 from sal.utils.parser import H4ArgumentParser
 from sal.utils.score import score, score_pass_at_k
 
-from prm_toolkit import PrmConfig, PrmServer, load_prm_server
+# from prm_toolkit import PrmConfig, PrmServer, load_prm_server
 
 logging.basicConfig(level=logging.INFO)
 
@@ -60,23 +60,23 @@ def main():
         tensor_parallel_size=num_gpus,
     )
 
-    prm_config = PrmConfig(
-        prm_path=config.prm_path,
-        base_url=config.prm_base_url,
-        max_tokens=config.max_model_len,
-        use_local_mode=True,
-        gpu_memory_utilization=0.9-config.gpu_memory_utilization,
-        tensor_parallel_size=num_gpus,
-        )
+    # prm_config = PrmConfig(
+    #     prm_path=config.prm_path,
+    #     base_url=config.prm_base_url,
+    #     max_tokens=config.max_model_len,
+    #     use_local_mode=True,
+    #     gpu_memory_utilization=0.9-config.gpu_memory_utilization,
+    #     tensor_parallel_size=num_gpus,
+    #     )
 
-    prm = load_prm_server(prm_config)
+    # prm = load_prm_server(prm_config)
 
     dataset = get_dataset(config)
     dataset = dataset.map(
         approach_fn,
         batched=True,
         batch_size=config.search_batch_size,
-        fn_kwargs={"config": config, "llm": llm, "prm": prm},
+        fn_kwargs={"config": config, "llm": llm},
         desc="Running search",
         load_from_cache_file=False,
     )

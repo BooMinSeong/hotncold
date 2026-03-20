@@ -116,17 +116,11 @@ def safe_parse_answer(text: str) -> str:
 
 def subsample_completions(x: Dict[str, List[Any]], n: int) -> Dict[str, List[Any]]:
     completions = x["completions"]
-    agg_scores = x["agg_scores"]
-    if len(completions) != len(agg_scores):
-        raise ValueError(
-            f"The number of completions and agg_scores should be the same. Got {len(completions)} completions and {len(agg_scores)} agg_scores."
-        )
 
     # Take the first n samples, as the completions are ordered in groups of size m e.g [0,0,0,0, 1,1,1,1, 2,2,2,2, ...]
     # We need to ensure these groups are not broken up in order to have a valid comparison at smaller n
     return {
         f"completions@{n}": completions[:n],
-        f"agg_scores@{n}": agg_scores[:n],
     }
 
 
@@ -237,6 +231,38 @@ def find_majority_answer(answers: List[str]) -> str:
         if count == max_count:
             # Return the first occurring group in case of a tie
             return canonical_to_original[canonical_form]
+
+
+def score_all_subsets(x: Dict[str, List[Any]], subsets: List[int]) -> Dict[str, str]:
+    """
+    Compute pred_maj@n for all subset sizes in a single pass.
+    Parses completions and computes canonical forms only once per completion.
+    """
+    completions = x["completions"]
+    # Parse all completions once
+    preds = [safe_parse_answer(c) for c in completions]
+    # Compute canonical forms once
+    canonical_preds = [memoized_canonical_form(p) for p in preds]
+
+    result = {}
+    for n in subsets:
+        subset_preds = preds[:n]
+        subset_canonical = canonical_preds[:n]
+
+        canonical_groups: Dict[str, int] = defaultdict(int)
+        canonical_to_original: Dict[str, str] = {}
+        for pred, canonical in zip(subset_preds, subset_canonical):
+            canonical_groups[canonical] += 1
+            if canonical not in canonical_to_original:
+                canonical_to_original[canonical] = pred
+
+        max_count = max(canonical_groups.values())
+        for cf, count in canonical_groups.items():
+            if count == max_count:
+                result[f"pred_maj@{n}"] = "\\boxed{" + canonical_to_original[cf] + "}"
+                break
+
+    return result
 
 
 def pass_at_k(n: int, c: int, k: int) -> float:
