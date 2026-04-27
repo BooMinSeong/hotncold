@@ -1,13 +1,13 @@
 #!/bin/bash
 
-# SEEDS=(0 42 64 128 256 512)
-SEEDS=(128 256 512)
+SEEDS=(0 42 64 128 256 512)
+# SEEDS=(128 256 512)
 SEARCH_METHODS=("best_of_n.yaml") # "beam_search.yaml" "dvts.yaml"
 METHOD_NAMES=("bon") # "beam_search"  "dvts"
 DATASET_NAME="ENSEONG/math-private" # math-ai/aime25 "HuggingFaceH4/MATH-500"
 # DATASET_NAME="ENSEONG/gsm8k-private" # math-ai/aime25 "HuggingFaceH4/MATH-500" "ENSEONG/math-private"
-# MODEL_NAME="Llama-3.2-3B-Instruct" # meta-llama/Llama-3.2-3B-Instruct # Qwen2.5-3B-Instruct # Qwen3-4B-Instruct-2507
-MODEL_NAME="Qwen2.5-3B-Instruct"
+MODEL_NAME="Llama-3.2-3B-Instruct" # meta-llama/Llama-3.2-3B-Instruct # Qwen2.5-3B-Instruct # Qwen3-4B-Instruct-2507
+# MODEL_NAME="Qwen2.5-3B-Instruct"
 N=256
 
 # GPU partition: "A100-80GB" or "L40S"

@@ -6,11 +6,11 @@ SEEDS=(0 42 64 128 256 512)
 METHOD_NAMES=("bon")
 TEMPERATURES=(0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0 1.1 1.2)
 # TEMPERATURES=(0.8)
-DATASET_NAME="ENSEONG/math-private" # math-ai/aime25" # HuggingFaceH4/MATH-500" 
-# DATASET_NAME="ENSEONG/gsm8k-private" # math-ai/aime25" # HuggingFaceH4/MATH-500" 
+DATASET_NAME="ENSEONG/math-private" # math-ai/aime25" # HuggingFaceH4/MATH-500"
+# DATASET_NAME="ENSEONG/gsm8k-private" # math-ai/aime25" # HuggingFaceH4/MATH-500"
 # MODEL_NAME="Qwen3-4B-Instruct-2507"
-# MODEL_NAME="Llama-3.2-3B-Instruct" # meta-llama/Llama-3.2-3B-Instruct # Qwen2.5-3B-Instruct # Qwen3-4B-Instruct-2507
-MODEL_NAME="Qwen2.5-3B-Instruct"
+MODEL_NAME="Llama-3.2-3B-Instruct" # meta-llama/Llama-3.2-3B-Instruct # Qwen2.5-3B-Instruct # Qwen3-4B-Instruct-2507
+# MODEL_NAME="Qwen2.5-3B-Instruct"
 
 # Default parameters from config (must match src/sal/config.py)
 TOP_P=1.0

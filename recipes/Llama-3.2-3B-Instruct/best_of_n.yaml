@@ -9,3 +9,5 @@ prm_batch_size: 16
 sort_completed: true
 filter_duplicates: true
 seed: 0
+max_model_len: 2048
+max_tokens: 1024
