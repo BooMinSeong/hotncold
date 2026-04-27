@@ -17,11 +17,13 @@ import logging
 
 import datasets
 import torch
+from datasets import load_dataset
 from vllm import LLM
 
 from sal.config import Config
 from sal.search import beam_search, best_of_n, dvts
 from sal.utils.data import get_dataset, save_dataset
+from sal.utils.hub import revision_exists
 from sal.utils.parser import H4ArgumentParser
 from sal.utils.score import score, score_pass_at_k
 
@@ -49,37 +51,35 @@ def main():
     logger.info("Config: %s", config)
 
     approach_fn = APPROACHES[config.approach]
+    gen_revision = f"{config.revision}-gen"
 
-    num_gpus = torch.cuda.device_count()
-    llm = LLM(
-        model=config.model_path,
-        gpu_memory_utilization=config.gpu_memory_utilization,
-        enable_prefix_caching=True,
-        max_model_len=config.max_model_len,
-        seed=config.seed,
-        tensor_parallel_size=num_gpus,
-    )
-
-    # prm_config = PrmConfig(
-    #     prm_path=config.prm_path,
-    #     base_url=config.prm_base_url,
-    #     max_tokens=config.max_model_len,
-    #     use_local_mode=True,
-    #     gpu_memory_utilization=0.9-config.gpu_memory_utilization,
-    #     tensor_parallel_size=num_gpus,
-    #     )
-
-    # prm = load_prm_server(prm_config)
-
-    dataset = get_dataset(config)
-    dataset = dataset.map(
-        approach_fn,
-        batched=True,
-        batch_size=config.search_batch_size,
-        fn_kwargs={"config": config, "llm": llm},
-        desc="Running search",
-        load_from_cache_file=False,
-    )
+    if config.push_to_hub and revision_exists(config.hub_dataset_id, gen_revision):
+        logger.info(
+            f"Found existing {gen_revision}; loading and skipping generation"
+        )
+        dataset = load_dataset(
+            config.hub_dataset_id, revision=gen_revision, split="train"
+        )
+    else:
+        dataset = get_dataset(config)
+        num_gpus = torch.cuda.device_count()
+        llm = LLM(
+            model=config.model_path,
+            gpu_memory_utilization=config.gpu_memory_utilization,
+            enable_prefix_caching=True,
+            max_model_len=config.max_model_len,
+            seed=config.seed,
+            tensor_parallel_size=num_gpus,
+        )
+        dataset = dataset.map(
+            approach_fn,
+            batched=True,
+            batch_size=config.search_batch_size,
+            fn_kwargs={"config": config, "llm": llm},
+            desc="Running search",
+            load_from_cache_file=False,
+        )
+        save_dataset(dataset, config, suffix="-gen")
 
     dataset = score(dataset, config)
     dataset = score_pass_at_k(dataset, config)

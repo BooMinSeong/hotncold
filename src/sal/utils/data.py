@@ -38,7 +38,8 @@ def get_dataset(config: Config) -> Dataset:
     return dataset
 
 
-def save_dataset(dataset, config):
+def save_dataset(dataset, config, suffix: str = ""):
+    revision = f"{config.revision}{suffix}"
     if config.push_to_hub:
         # Since concurrent pushes can get rejected by the Hub, we make several attempts to push the dataset with try/except
         for _ in range(20):
@@ -51,17 +52,17 @@ def save_dataset(dataset, config):
                     )[-1]
                     create_branch(
                         repo_id=config.hub_dataset_id,
-                        branch=config.revision,
+                        branch=revision,
                         revision=initial_commit.commit_id,
                         exist_ok=True,
                         repo_type="dataset",
                     )
                 url = dataset.push_to_hub(
                     config.hub_dataset_id,
-                    revision=config.revision,
+                    revision=revision,
                     split="train",
                     private=config.hub_dataset_private,
-                    commit_message=f"Add {config.revision}",
+                    commit_message=f"Add {revision}",
                 )
                 break
             except Exception as e:
@@ -72,9 +73,6 @@ def save_dataset(dataset, config):
         if config.output_dir is None:
             config.output_dir = f"data/{config.model_path}"
         Path(config.output_dir).mkdir(parents=True, exist_ok=True)
-        dataset.to_json(
-            f"{config.output_dir}/{config.approach}_completions.jsonl", lines=True
-        )
-        logger.info(
-            f"Saved completions to {config.output_dir}/{config.approach}_completions.jsonl"
-        )
+        filename = f"{config.approach}_completions{suffix}.jsonl"
+        dataset.to_json(f"{config.output_dir}/{filename}", lines=True)
+        logger.info(f"Saved completions to {config.output_dir}/{filename}")
