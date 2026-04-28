@@ -25,3 +25,7 @@ def get_dataset_revisions(dataset_id: str) -> List[str]:
         return []
     refs = list_repo_refs(dataset_id, repo_type="dataset")
     return [ref.name for ref in refs.branches if ref.name != "main"]
+
+
+def revision_exists(dataset_id: str, revision: str) -> bool:
+    return revision in get_dataset_revisions(dataset_id)
