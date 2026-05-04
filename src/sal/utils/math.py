@@ -301,7 +301,7 @@ def compute_pass_at_k(x, k):
         raise ValueError("Answer is empty")
 
     # Compute the canonical form of the correct answer
-    gold_answer = parse("\\boxed{" + x["answer"] + "}")
+    gold_answer = parse("\\boxed{" + str(x["answer"]) + "}")
 
     # Compute the count of predictions matching the canonical answer
     c = sum(verify(gold_answer, parse("\\boxed{" + pred + "}")) for pred in x["preds"])
