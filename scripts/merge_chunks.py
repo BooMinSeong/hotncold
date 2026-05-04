@@ -43,6 +43,7 @@ class Args:
     dataset_name: str
     dataset_split: str = "train"
     filter_strings: List[str] = field(default_factory=list)
+    exclude_strings: List[str] = field(default_factory=list)
     hub_dataset_private: bool = False
 
 
@@ -68,6 +69,12 @@ def main():
             revision
             for revision in revisions
             if all(filter_string in revision for filter_string in args.filter_strings)
+        ]
+    if args.exclude_strings:
+        revisions = [
+            revision
+            for revision in revisions
+            if not any(s in revision for s in args.exclude_strings)
         ]
 
     merged_config = revisions[0].split("--chunk")[0]
