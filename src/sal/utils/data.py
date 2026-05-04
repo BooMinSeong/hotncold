@@ -11,6 +11,7 @@
 # limitations under the License.
 
 import logging
+import random
 import time
 from pathlib import Path
 
@@ -41,8 +42,10 @@ def get_dataset(config: Config) -> Dataset:
 def save_dataset(dataset, config, suffix: str = ""):
     revision = f"{config.revision}{suffix}"
     if config.push_to_hub:
-        # Since concurrent pushes can get rejected by the Hub, we make several attempts to push the dataset with try/except
-        for _ in range(20):
+        # Concurrent pushes get rejected by HF free-tier rate limits.
+        # Use exponential backoff with jitter; fall back to local jsonl if all retries fail.
+        max_attempts = 20
+        for attempt in range(max_attempts):
             try:
                 # Create branch from the repo's initial commit.
                 # This is needed to avoid branching from a commit on main that already has data
@@ -64,11 +67,24 @@ def save_dataset(dataset, config, suffix: str = ""):
                     private=config.hub_dataset_private,
                     commit_message=f"Add {revision}",
                 )
-                break
+                logger.info(f"Pushed dataset to {url}")
+                return
             except Exception as e:
-                logger.error(f"Error pushing dataset to the Hub: {e}")
-                time.sleep(5)
-        logger.info(f"Pushed dataset to {url}")
+                # cap at 120s; jitter to spread out concurrent retries
+                base = min(120, 5 * (2 ** attempt))
+                sleep_s = base * random.uniform(0.7, 1.3)
+                logger.error(
+                    f"Error pushing dataset (attempt {attempt+1}/{max_attempts}): {e}; sleeping {sleep_s:.1f}s"
+                )
+                time.sleep(sleep_s)
+        # Fallback: persist generation/score results locally so they aren't lost.
+        fallback_dir = Path("data/failed-push") / config.hub_dataset_id.replace("/", "_")
+        fallback_dir.mkdir(parents=True, exist_ok=True)
+        fallback_path = fallback_dir / f"{revision}.jsonl"
+        dataset.to_json(str(fallback_path), lines=True)
+        logger.warning(
+            f"All {max_attempts} push attempts failed for {revision}; saved locally to {fallback_path}"
+        )
     else:
         if config.output_dir is None:
             config.output_dir = f"data/{config.model_path}"
