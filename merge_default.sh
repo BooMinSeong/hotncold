@@ -38,7 +38,8 @@ for TEMPERATURE in "${TEMPERATURES[@]}"; do
             echo "Merging: Temp=$TEMPERATURE, Method=$METHOD_NAME, Dataset=$DATASET_REPO, Filter=$FILTER_STR"
             python scripts/merge_chunks.py \
                 --dataset_name=$DATASET_REPO \
-                --filter_strings $FILTER_STR 
+                --filter_strings $FILTER_STR \
+                --exclude_strings=-gen
         done
     done
 done
